@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+	PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+	"https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.likelion.backend.common.logging.RequestLogMapper">
+
+	<insert id="insert" parameterType="com.likelion.backend.common.logging.RequestLog">
+		INSERT INTO request (
+			uuid, ip, user_agent, method, host, url,
+			body, query, params, headers, cookies,
+			response_body, error, status, duration
+		) VALUES (
+			#{uuid}, #{ip}, #{userAgent}, #{method}, #{host}, #{url},
+			#{body}, #{query}, #{params}, #{headers}, #{cookies},
+			#{responseBody}, #{error}, #{status}, #{duration}
+		)
+	</insert>
+
+</mapper>

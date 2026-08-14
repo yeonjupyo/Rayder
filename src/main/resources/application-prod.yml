@@ -1,0 +1,14 @@
+spring:
+  datasource:
+    url: ${DB_URL}
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
+    driver-class-name: org.mariadb.jdbc.Driver
+    hikari:
+      maximum-pool-size: 20
+      connection-timeout: 3000
+
+logging:
+  level:
+    com.likelion.backend: INFO
+    org.mybatis: WARN
