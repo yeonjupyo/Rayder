@@ -16,6 +16,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
@@ -55,6 +56,18 @@ public class GlobalExceptionHandler {
 		logFailedRequest(request, HttpStatus.BAD_REQUEST.value(), message);
 		ErrorResponse body = ErrorResponse.of(
 			HttpStatus.BAD_REQUEST.value(), "VALIDATION_ERROR", message, request.getRequestURI()
+		);
+		return ResponseEntity.badRequest().body(body);
+	}
+
+	@ExceptionHandler(HttpMessageNotReadableException.class)
+	public ResponseEntity<ErrorResponse> handleUnreadableMessage(
+		HttpMessageNotReadableException ex, HttpServletRequest request
+	) {
+		String message = "Malformed JSON or unsupported field value";
+		logFailedRequest(request, HttpStatus.BAD_REQUEST.value(), message);
+		ErrorResponse body = ErrorResponse.of(
+			HttpStatus.BAD_REQUEST.value(), "INVALID_REQUEST_BODY", message, request.getRequestURI()
 		);
 		return ResponseEntity.badRequest().body(body);
 	}
