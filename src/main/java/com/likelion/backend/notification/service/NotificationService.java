@@ -2,19 +2,26 @@ package com.likelion.backend.notification.service;
 
 import com.likelion.backend.common.exception.BusinessException;
 import com.likelion.backend.notification.domain.NotificationSetting;
+import com.likelion.backend.notification.domain.NotificationType;
 import com.likelion.backend.notification.domain.NotificationWarningSetting;
 import com.likelion.backend.notification.dto.NotificationListResponse;
 import com.likelion.backend.notification.dto.NotificationSettingRequest;
 import com.likelion.backend.notification.dto.NotificationSettingResponse;
 import com.likelion.backend.notification.dto.NotificationUpdateRequest;
 import com.likelion.backend.notification.dto.WarningSettingResponse;
+import com.likelion.backend.notification.dto.DeviceTokenRequest;
+import com.likelion.backend.notification.dto.NotificationLocationRequest;
+import com.likelion.backend.notification.dto.NotificationLocationResponse;
+import com.likelion.backend.environment.client.RegionResolver;
 import com.likelion.backend.notification.mapper.NotificationMapper;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.time.format.ResolverStyle;
 import java.util.HashSet;
+import java.util.EnumMap;
 import java.util.List;
+import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -27,11 +34,19 @@ public class NotificationService {
 	private static final DateTimeFormatter TIME_FORMAT = DateTimeFormatter.ofPattern("HH:mm")
 		.withResolverStyle(ResolverStyle.STRICT);
 	private final NotificationMapper notificationMapper;
+	private final RegionResolver regionResolver;
 
 	public NotificationListResponse findAll(long userId) {
 		validateUser(userId);
-		List<NotificationSettingResponse> settings = notificationMapper.findAllByUserId(userId)
-			.stream().map(this::toResponse).toList();
+		Map<NotificationType, NotificationSetting> settingsByType = new EnumMap<>(NotificationType.class);
+		notificationMapper.findAllByUserId(userId)
+			.forEach(setting -> settingsByType.put(setting.getType(), setting));
+		List<NotificationSettingResponse> settings = List.of(NotificationType.values()).stream()
+			.map(type -> {
+				NotificationSetting setting = settingsByType.get(type);
+				return setting == null ? defaultResponse(type) : toResponse(setting);
+			})
+			.toList();
 		WarningSettingResponse warning = notificationMapper.findWarningByUserId(userId)
 			.map(this::toWarningResponse)
 			.orElse(new WarningSettingResponse(false, null, null));
@@ -45,7 +60,7 @@ public class NotificationService {
 			throw new BusinessException("NOTIFICATION_ALREADY_EXISTS",
 				"Notification setting already exists for type " + request.type(), HttpStatus.CONFLICT);
 		}
-		List<LocalTime> times = parseTimes(request.times());
+		List<LocalTime> times = parseTimes(request.enabled(), request.times());
 		NotificationSetting setting = NotificationSetting.builder().userId(userId)
 			.type(request.type()).enabled(request.enabled()).build();
 		notificationMapper.insertSetting(setting);
@@ -57,7 +72,7 @@ public class NotificationService {
 	public NotificationSettingResponse update(long notificationId, long userId,
 		NotificationUpdateRequest request) {
 		NotificationSetting setting = requireOwned(notificationId, userId);
-		List<LocalTime> times = parseTimes(request.times());
+		List<LocalTime> times = parseTimes(request.enabled(), request.times());
 		setting.changeEnabled(request.enabled());
 		notificationMapper.updateSetting(setting);
 		notificationMapper.deleteTimes(notificationId);
@@ -78,6 +93,33 @@ public class NotificationService {
 		return notificationMapper.findWarningByUserId(userId).map(this::toWarningResponse)
 			.orElseThrow(() -> new BusinessException("WARNING_SETTING_SAVE_FAILED",
 				"Warning setting could not be saved", HttpStatus.INTERNAL_SERVER_ERROR));
+	}
+
+	@Transactional
+	public void registerDevice(long userId, DeviceTokenRequest request) {
+		validateUser(userId);
+		notificationMapper.upsertDeviceToken(userId, request.token(), request.platform());
+	}
+
+	@Transactional
+	public void unregisterDevice(long userId, String token) {
+		validateUser(userId);
+		notificationMapper.deactivateDeviceToken(userId, token);
+	}
+
+	@Transactional
+	public NotificationLocationResponse updateLocation(long userId, NotificationLocationRequest request) {
+		validateUser(userId);
+		var region = regionResolver.resolve(request.sido(), request.gugun());
+		notificationMapper.upsertLocation(userId, region.sido(), region.gugun());
+		return new NotificationLocationResponse(region.sido(), region.gugun());
+	}
+
+	public NotificationLocationResponse findLocation(long userId) {
+		validateUser(userId);
+		return notificationMapper.findLocation(userId)
+			.map(location -> new NotificationLocationResponse(location.sido(), location.gugun()))
+			.orElse(null);
 	}
 
 	private NotificationSetting requireOwned(long notificationId, long userId) {
@@ -102,11 +144,19 @@ public class NotificationService {
 			setting.isEnabled(), times, setting.getCreatedAt(), setting.getUpdatedAt());
 	}
 
+	private NotificationSettingResponse defaultResponse(NotificationType type) {
+		return new NotificationSettingResponse(null, type, false, List.of(), null, null);
+	}
+
 	private WarningSettingResponse toWarningResponse(NotificationWarningSetting setting) {
 		return new WarningSettingResponse(setting.isEnabled(), setting.getCreatedAt(), setting.getUpdatedAt());
 	}
 
-	private List<LocalTime> parseTimes(List<String> values) {
+	private List<LocalTime> parseTimes(boolean enabled, List<String> values) {
+		if (enabled && values.isEmpty()) {
+			throw new BusinessException("NOTIFICATION_TIME_REQUIRED",
+				"At least one notification time is required when enabled", HttpStatus.BAD_REQUEST);
+		}
 		List<LocalTime> times;
 		try {
 			times = values.stream().map(value -> LocalTime.parse(value, TIME_FORMAT)).sorted().toList();

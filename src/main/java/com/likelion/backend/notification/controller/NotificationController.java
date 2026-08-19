@@ -6,6 +6,10 @@ import com.likelion.backend.notification.dto.NotificationSettingResponse;
 import com.likelion.backend.notification.dto.NotificationUpdateRequest;
 import com.likelion.backend.notification.dto.WarningSettingRequest;
 import com.likelion.backend.notification.dto.WarningSettingResponse;
+import com.likelion.backend.notification.dto.DeviceTokenRequest;
+import com.likelion.backend.notification.dto.DeviceTokenDeleteRequest;
+import com.likelion.backend.notification.dto.NotificationLocationRequest;
+import com.likelion.backend.notification.dto.NotificationLocationResponse;
 import com.likelion.backend.notification.service.NotificationService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -61,11 +65,36 @@ public class NotificationController {
 		return ResponseEntity.noContent().build();
 	}
 
-	@PutMapping("/uv-exposure-warning")
+	@PutMapping("/uv-risk-warning")
 	public WarningSettingResponse updateWarning(
 		@RequestAttribute(name = AUTHENTICATED_USER_ID) long userId,
 		@Valid @RequestBody WarningSettingRequest request
 	) {
 		return notificationService.updateWarning(userId, request.enabled());
+	}
+
+	@PostMapping("/devices")
+	public ResponseEntity<Void> registerDevice(@RequestAttribute(name = AUTHENTICATED_USER_ID) long userId,
+		@Valid @RequestBody DeviceTokenRequest request) {
+		notificationService.registerDevice(userId, request);
+		return ResponseEntity.noContent().build();
+	}
+
+	@DeleteMapping("/devices")
+	public ResponseEntity<Void> unregisterDevice(@RequestAttribute(name = AUTHENTICATED_USER_ID) long userId,
+		@Valid @RequestBody DeviceTokenDeleteRequest request) {
+		notificationService.unregisterDevice(userId, request.token());
+		return ResponseEntity.noContent().build();
+	}
+
+	@GetMapping("/location")
+	public NotificationLocationResponse findLocation(@RequestAttribute(name = AUTHENTICATED_USER_ID) long userId) {
+		return notificationService.findLocation(userId);
+	}
+
+	@PutMapping("/location")
+	public NotificationLocationResponse updateLocation(@RequestAttribute(name = AUTHENTICATED_USER_ID) long userId,
+		@Valid @RequestBody NotificationLocationRequest request) {
+		return notificationService.updateLocation(userId, request);
 	}
 }

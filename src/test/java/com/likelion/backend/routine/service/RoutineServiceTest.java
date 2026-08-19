@@ -6,6 +6,8 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.likelion.backend.ai.dto.AiRoutineItem;
+import com.likelion.backend.ai.dto.AiRoutineSaveRequest;
 import com.likelion.backend.common.exception.BusinessException;
 import com.likelion.backend.routine.domain.RoutineItem;
 import com.likelion.backend.routine.domain.RoutineType;
@@ -102,6 +104,40 @@ class RoutineServiceTest {
 		verify(mapper).updateItemOrder(11L, 1);
 	}
 
+	@Test
+	void aiSaveConvertsSelectionToGeneralRoutineAndSkipsExactDuplicates() {
+		when(mapper.existsUser(7L)).thenReturn(true);
+		when(mapper.findRoutineByUserIdAndType(7L, RoutineType.MORNING))
+			.thenReturn(Optional.of(routine(1L, 7L, RoutineType.MORNING)));
+		when(mapper.findRoutineByUserIdAndType(7L, RoutineType.EVENING))
+			.thenReturn(Optional.of(routine(2L, 7L, RoutineType.EVENING)));
+		when(mapper.findActiveItems(1L)).thenReturn(
+			List.of(itemNamed(10L, 1L, 7L, 1, "세안")),
+			List.of(itemNamed(10L, 1L, 7L, 1, "세안")));
+		when(mapper.findActiveItems(2L)).thenReturn(List.of(), List.of());
+		AiRoutineSaveRequest request = new AiRoutineSaveRequest(List.of(
+			new AiRoutineItem(1, "세안", "중복 항목"), new AiRoutineItem(2, "토너", "피부결 정돈")),
+			List.of(new AiRoutineItem(1, "크림", "보습 마무리")));
+
+		service.saveFromAi(7L, request);
+
+		org.mockito.ArgumentCaptor<RoutineItem> captor = org.mockito.ArgumentCaptor.forClass(RoutineItem.class);
+		verify(mapper, org.mockito.Mockito.times(2)).insertItem(captor.capture());
+		assertThat(captor.getAllValues()).extracting(RoutineItem::getName).containsExactly("토너", "크림");
+		assertThat(captor.getAllValues()).allMatch(RoutineItem::isAiRecommended);
+	}
+
+	@Test
+	void aiSaveRejectsNonConsecutiveOrderBeforeWriting() {
+		when(mapper.existsUser(7L)).thenReturn(true);
+		AiRoutineSaveRequest request = new AiRoutineSaveRequest(
+			List.of(new AiRoutineItem(2, "토너", "피부결 정돈")), List.of());
+
+		assertThatThrownBy(() -> service.saveFromAi(7L, request)).isInstanceOf(BusinessException.class)
+			.extracting("code").isEqualTo("INVALID_AI_ROUTINE");
+		verify(mapper, never()).insertItem(org.mockito.ArgumentMatchers.any());
+	}
+
 	private UserRoutine routine(long id, long userId, RoutineType type) {
 		return UserRoutine.builder().routineId(id).userId(userId).type(type).build();
 	}
@@ -109,5 +145,10 @@ class RoutineServiceTest {
 	private RoutineItem item(long id, long routineId, long userId, int order, boolean completed) {
 		return RoutineItem.builder().itemId(id).routineId(routineId).userId(userId)
 			.name("item-" + id).stepOrder(order).completed(completed).build();
+	}
+
+	private RoutineItem itemNamed(long id, long routineId, long userId, int order, String name) {
+		return RoutineItem.builder().itemId(id).routineId(routineId).userId(userId)
+			.name(name).stepOrder(order).build();
 	}
 }

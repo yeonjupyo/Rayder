@@ -2,7 +2,7 @@
 
 ## Scope and decision status
 
-This document fixes the API and persistence boundary before OpenAI or RAG implementation. **Confirmed** items are supported by the current repository, frontend, or database mapping. **Proposed** items are the contract for later implementation. **Open** items must not be implemented until the missing product/schema decision is supplied.
+This document describes the implemented first version of the OpenAI/RAG recommendation flow. Generated recommendations and retrieved evidence remain transient.
 
 No `AI_RECOMMENDATION`, `AI_RECOMMENDATION_ITEM`, or recommendation-history table is introduced. A generated recommendation is transient until the user explicitly saves the payload as a user routine.
 
@@ -52,20 +52,16 @@ The frontend sends `latitude` and `longitude` for each recommendation request. T
 
 The frontend dummy model and Figma-linked screen establish skin type and a diagnosis/condition summary, an environment status summary, morning/evening tabs, ordered `name`/`detail` rows, and recommendation reasons displayed as one list below the routine card.
 
-Reasons belong to the whole recommendation, not individual items. The response contains `statusSummary`, `morning`, `evening`, and `reasons`. Morning and evening are both generated and should each contain at least one item when possible, but either array may be empty. Each array has at most 5 items; `reasons` has at most 3. Item `name` is 1–30 characters, `detail` is at most 100 characters, and `order` starts at 1 and is consecutive within each time section.
+Reasons belong to the whole recommendation, not individual items. The response contains `skinType`, `diagnosisResult`, `environment`, `morning`, `evening`, and `reasons`. Morning and evening each contain 1–5 items; `reasons` has at most 3. Item `name` is 1–20 characters, `detail` is 1–30 characters, and `order` starts at 1 and is consecutive within each time section.
 
 ```json
 {
-  "statusSummary": {
-    "skinType": "DRY",
-    "diagnosisResult": "...existing diagnosis result value...",
-    "environmentAvailable": true,
-    "environment": {
-      "region": "서울특별시 강남구",
-      "uv": {"value": 7.0, "level": "높음", "observedAt": "2026-08-19T15:00:00"},
-      "pm10": {"value": 18.0, "level": "좋음", "observedAt": "2026-08-19T15:00:00"},
-      "pm25": {"value": 9.0, "level": "좋음", "observedAt": "2026-08-19T15:00:00"}
-    }
+  "skinType": "DRY",
+  "diagnosisResult": "...existing diagnosis result value...",
+  "environment": {
+    "available": true,
+    "uvLevel": "높음",
+    "dustLevel": "좋음 / 좋음"
   },
   "reasons": ["수분 보충과 장벽 관리가 필요해요."],
   "morning": [{"order": 1, "name": "약산성 클렌저", "detail": "쌓인 노폐물 제거"}],
@@ -75,7 +71,7 @@ Reasons belong to the whole recommendation, not individual items. The response c
 
 `skinType` maps from `skin_type` as a string of at most 20 characters, and `diagnosisResult` maps from nullable `result_summary` as a string of at most 255 characters. The response must preserve existing values rather than introduce a speculative enum or column.
 
-## Transient recommendation and save flow — confirmed
+## Transient recommendation and explicit conversion flow
 
 ```text
 JWT userId -> latest DIAGNOSIS_RESULT --------------+
@@ -83,25 +79,32 @@ latitude/longitude -> EnvironmentQueryService -----+-> prompt input
 RAG query -> retrieved context --------------------+-> OpenAI structured output
                                                     -> response (not persisted)
                                                     -> frontend review
-frontend sends displayed morning/evening items -----> USER_ROUTINE / ROUTINE_ITEM
+user selects checklist save -----------------------> USER_ROUTINE / ROUTINE_ITEM
 ```
 
-There is no recommendation ID and no recommendation read endpoint. The save request contains the displayed morning/evening items. On save they become ordinary routine items and may be added, edited, soft-deleted, reordered, and checked per date. Later edits neither update nor refer back to the transient recommendation. `is_ai_recommended` may be true as existing provenance metadata; it is not a history relationship.
+There is no recommendation ID and no recommendation read endpoint. The response, diagnosis input, environment input, and retrieved evidence are never persisted by the AI feature.
 
-An AI save needs a dedicated transactional batch operation (proposed `POST /api/routines/from-ai`) rather than many calls to the current single-item endpoint. It creates missing morning/evening `USER_ROUTINE` rows and inserts validated items into `ROUTINE_ITEM` with submitted order.
+Generation never writes to `ROUTINE_ITEM`. Only after the user explicitly selects “체크리스트 저장하기” does `POST /api/routines/from-ai` convert the submitted morning/evening items into ordinary user routine data. The operation reuses or creates the authenticated user's `USER_ROUTINE` for each time type and appends items to the existing `ROUTINE_ITEM` structure in one transaction.
 
-The save policy is **append**. Reuse an existing `USER_ROUTINE` for the same time or create it when absent, then append new active items after the current maximum order. If an active item in that same time section has exactly the same `name`, skip it. Name comparison is exact; do not apply fuzzy, case-insensitive, or `detail` comparison. Completion state is not copied from the recommendation and begins independently for each date through the existing completion table.
+The submitted payload is untrusted and is validated independently of the earlier response. Each section has at most five items, order is consecutive from 1, names are at most 20 characters, details are at most 30 characters, and both sections cannot be empty. Active items with an exactly equal name in the same time section are skipped; exact duplicates inside the request are also stored once. Existing routine items are never replaced. `is_ai_recommended=true` records provenance only and does not create a recommendation-history relationship.
 
-The frontend payload is untrusted input. Saving never calls OpenAI again, but the backend must validate DTO shape, lengths, counts, and consecutive order; authenticate the user and verify routine ownership; remove same-time exact-name duplicates (including duplicates inside the request); and persist the remaining items atomically. Only `morning` and `evening` items are saved. `statusSummary`, `reasons`, diagnosis, and environment data are not accepted or persisted by the save endpoint.
+Conversion does not create completion rows. Saved entries subsequently use the existing date-specific completion flow exactly like manually entered general routine items.
 
 ## Environment failure fallback — confirmed
 
-An environment provider failure does not prevent recommendation generation. Continue with the latest diagnosis and RAG knowledge, set `statusSummary.environmentAvailable` to false and `environment` to null, and include this prompt rule:
+An environment provider failure does not prevent recommendation generation. Continue with the latest diagnosis and RAG knowledge, return `environment.available=false`, and include this prompt rule:
 
 > 환경정보를 조회할 수 없는 상태입니다. 피부진단 결과와 검색된 피부 관리 지식만을 기반으로 추천하세요.
 
 The model must not invent UV, PM10, PM2.5, their levels, region, or observation time. This fallback applies to environment lookup/provider failure; a missing diagnosis still returns `DIAGNOSIS_RESULT_NOT_FOUND`.
 
-## RAG connection point — proposed, not implemented
+## RAG and OpenAI implementation
 
-Build the search query after diagnosis and environment retrieval from the confirmed diagnosis values plus UV, PM10, and PM2.5 values/levels. Add retrieved evidence to the OpenAI prompt alongside those inputs, before structured response generation. Vector storage, embeddings, retrieval implementation, and OpenAI calls remain out of scope.
+- Knowledge source: project-supplied `src/main/resources/rag/Rayder_RAG.pdf`.
+- Extraction/chunking: Apache PDFBox, whitespace normalization, 900 characters with 150-character overlap.
+- Embedding: OpenAI `text-embedding-3-small`; document vectors initialize lazily and remain cached in memory.
+- Vector store/retrieval: in-process cosine search, similarity threshold 0.15, top 4. This avoids introducing another database or service for the single-document MVP.
+- Generation: OpenAI Responses API with `gpt-4o-mini`, `store=false`, and strict JSON Schema Structured Outputs.
+- Resilience: 3-second connect timeout, 30-second read timeout, and at most two attempts for 429, 5xx, and transport/timeout failures.
+
+The retrieval query combines diagnosis values with available UV, PM10, and PM2.5 values/levels. Retrieved chunks are inserted into the separated `[RAG CONTEXT]` prompt section. Empty retrieval returns `RAG_CONTEXT_NOT_FOUND`; the parsed model output is validated again before it is returned.

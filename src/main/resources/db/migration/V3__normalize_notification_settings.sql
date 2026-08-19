@@ -1,7 +1,7 @@
 -- Notification settings agreed on 2026-08-19.
 -- NOTIFICATION_SETTING was empty when this migration was prepared.
 -- Scheduled notification types: UV, DUST, ROUTINE.
--- The cumulative UV exposure warning is an independent, untimed preference.
+-- The UV-risk warning is an independent, untimed preference.
 
 ALTER TABLE NOTIFICATION_SETTING
     DROP COLUMN alert_time,

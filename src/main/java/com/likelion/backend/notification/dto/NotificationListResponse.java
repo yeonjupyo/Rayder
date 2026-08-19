@@ -4,6 +4,6 @@ import java.util.List;
 
 public record NotificationListResponse(
 	List<NotificationSettingResponse> notifications,
-	WarningSettingResponse uvExposureWarning
+	WarningSettingResponse uvRiskWarning
 ) {
 }

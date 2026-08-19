@@ -1,5 +1,8 @@
 package com.likelion.backend.routine.service;
 
+import com.likelion.backend.ai.dto.AiRoutineItem;
+import com.likelion.backend.ai.dto.AiRoutineSaveRequest;
+import com.likelion.backend.ai.dto.AiRoutineSaveResponse;
 import com.likelion.backend.common.exception.BusinessException;
 import com.likelion.backend.routine.domain.CareMemo;
 import com.likelion.backend.routine.domain.RoutineItem;
@@ -18,6 +21,7 @@ import com.likelion.backend.routine.mapper.RoutineMapper;
 import java.time.LocalDate;
 import java.time.format.DateTimeParseException;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DuplicateKeyException;
@@ -78,6 +82,55 @@ public class RoutineService {
 			.detail(trimNullable(request.detail())).stepOrder(order).aiRecommended(false).build();
 		mapper.insertItem(item);
 		return new RoutineItemResponse(item.getItemId(), item.getName(), item.getDetail(), false, order);
+	}
+
+	@Transactional
+	public AiRoutineSaveResponse saveFromAi(long userId, AiRoutineSaveRequest request) {
+		validateUser(userId);
+		validateAiSection(request.morning(), "morning");
+		validateAiSection(request.evening(), "evening");
+		if (request.morning().isEmpty() && request.evening().isEmpty()) {
+			throw new BusinessException("INVALID_AI_ROUTINE", "At least one routine item is required",
+				HttpStatus.BAD_REQUEST);
+		}
+		RoutineGroupResponse morning = appendAiItems(userId, RoutineType.MORNING, request.morning());
+		RoutineGroupResponse evening = appendAiItems(userId, RoutineType.EVENING, request.evening());
+		return new AiRoutineSaveResponse(morning, evening);
+	}
+
+	private RoutineGroupResponse appendAiItems(long userId, RoutineType type, List<AiRoutineItem> requested) {
+		UserRoutine routine = mapper.findRoutineByUserIdAndType(userId, type).orElseGet(() -> {
+			UserRoutine created = UserRoutine.builder().userId(userId).type(type).build();
+			mapper.insertRoutine(created);
+			return created;
+		});
+		List<RoutineItem> active = mapper.findActiveItems(routine.getRoutineId());
+		LinkedHashSet<String> names = new LinkedHashSet<>();
+		active.forEach(item -> names.add(item.getName()));
+		int nextOrder = active.stream().mapToInt(RoutineItem::getStepOrder).max().orElse(0) + 1;
+		for (AiRoutineItem value : requested) {
+			String name = value.name().trim();
+			if (!names.add(name)) continue;
+			RoutineItem item = RoutineItem.builder().routineId(routine.getRoutineId()).name(name)
+				.detail(value.detail().trim()).stepOrder(nextOrder++).aiRecommended(true).build();
+			mapper.insertItem(item);
+		}
+		return new RoutineGroupResponse(routine.getRoutineId(), type,
+			mapper.findActiveItems(routine.getRoutineId()).stream().map(this::itemResponse).toList());
+	}
+
+	private void validateAiSection(List<AiRoutineItem> items, String field) {
+		if (items == null || items.size() > 5) {
+			throw new BusinessException("INVALID_AI_ROUTINE", field + " must contain at most 5 items",
+				HttpStatus.BAD_REQUEST);
+		}
+		for (int index = 0; index < items.size(); index++) {
+			AiRoutineItem item = items.get(index);
+			if (item == null || item.order() != index + 1) {
+				throw new BusinessException("INVALID_AI_ROUTINE", field + " order must be consecutive from 1",
+					HttpStatus.BAD_REQUEST);
+			}
+		}
 	}
 
 	@Transactional

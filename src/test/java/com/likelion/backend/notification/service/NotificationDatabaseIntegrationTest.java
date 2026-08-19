@@ -5,6 +5,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.likelion.backend.notification.domain.NotificationType;
 import com.likelion.backend.notification.dto.NotificationSettingRequest;
 import com.likelion.backend.notification.dto.NotificationUpdateRequest;
+import com.likelion.backend.notification.dto.DeviceTokenRequest;
+import com.likelion.backend.notification.dto.NotificationLocationRequest;
+import com.likelion.backend.notification.domain.DevicePlatform;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
@@ -37,7 +40,7 @@ class NotificationDatabaseIntegrationTest {
 
 		var created = service.create(userId,
 			new NotificationSettingRequest(NotificationType.ROUTINE, true, List.of("08:00", "21:00")));
-		assertThat(service.findAll(userId).notifications()).hasSize(1);
+		assertThat(service.findAll(userId).notifications()).hasSize(3);
 		assertThat(created.times()).containsExactly("08:00", "21:00");
 
 		var disabled = service.update(created.notificationId(), userId,
@@ -51,8 +54,19 @@ class NotificationDatabaseIntegrationTest {
 		assertThat(enabled.times()).containsExactly("09:00", "18:00");
 
 		assertThat(service.updateWarning(userId, true).enabled()).isTrue();
+		service.registerDevice(userId, new DeviceTokenRequest(
+			"ExpoPushToken[integration-" + UUID.randomUUID() + "]", DevicePlatform.ANDROID));
+		var location = service.updateLocation(userId, new NotificationLocationRequest("서울", "강남구"));
+		assertThat(location.gugun()).isEqualTo("강남구");
+		assertThat(service.findLocation(userId)).isEqualTo(location);
 		service.delete(created.notificationId(), userId);
-		assertThat(service.findAll(userId).notifications()).isEmpty();
+		assertThat(service.findAll(userId).notifications())
+			.hasSize(3)
+			.allSatisfy(setting -> {
+				assertThat(setting.notificationId()).isNull();
+				assertThat(setting.enabled()).isFalse();
+				assertThat(setting.times()).isEmpty();
+			});
 	}
 
 	private long insertUser() {

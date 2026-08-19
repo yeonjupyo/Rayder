@@ -1,5 +1,7 @@
 package com.likelion.backend.routine.controller;
 
+import com.likelion.backend.ai.dto.AiRoutineSaveRequest;
+import com.likelion.backend.ai.dto.AiRoutineSaveResponse;
 import com.likelion.backend.routine.dto.MyRoutineResponse;
 import com.likelion.backend.routine.dto.RoutineCompletionRequest;
 import com.likelion.backend.routine.dto.RoutineCreateRequest;
@@ -44,6 +46,13 @@ public class RoutineController {
 		@RequestAttribute(name = AUTHENTICATED_USER_ID) long userId,
 		@Valid @RequestBody RoutineCreateRequest request) {
 		return ResponseEntity.status(HttpStatus.CREATED).body(service.createRoutine(userId, request.type()));
+	}
+
+	@PostMapping("/routines/from-ai")
+	public ResponseEntity<AiRoutineSaveResponse> saveFromAi(
+		@RequestAttribute(name = AUTHENTICATED_USER_ID) long userId,
+		@Valid @RequestBody AiRoutineSaveRequest request) {
+		return ResponseEntity.status(HttpStatus.CREATED).body(service.saveFromAi(userId, request));
 	}
 
 	@PostMapping("/routines/{routineId}/items")

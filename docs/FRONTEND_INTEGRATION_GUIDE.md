@@ -1,0 +1,210 @@
+# Frontend integration guide
+
+This guide describes the current backend code, not proposed endpoints. Backend base URL is `http://localhost:8080` by default. Prefer a frontend environment variable such as `VITE_API_BASE_URL` instead of embedding it in components.
+
+## Integration blocker: authentication
+
+All notification, routine, care-memo, and AI endpoints require backend request attribute `authenticatedUserId`. The intended frontend header is:
+
+```http
+Authorization: Bearer <JWT>
+```
+
+However, this repository currently has no JWT filter/security configuration that validates the header and creates that attribute. Do not send `userId` in a body or query parameter, and do not ship a workaround header. These endpoints become callable from the frontend only after the authentication module is merged. Environment endpoints do not require authentication.
+
+The current frontend `src/api/authApi.ts` is fully dummy/local-storage based and produces a dummy token; it is not compatible with the backend contract.
+
+## Shared contracts
+
+- Dates: `yyyy-MM-dd` (example `2026-08-20`).
+- Notification times: strict 24-hour `HH:mm` with leading zeros (example `09:05`).
+- Coordinates: `latitude`/`lat` is -90..90; `longitude`/`lon` is -180..180.
+- Routine enum: `MORNING`, `EVENING`.
+- Notification enum: `UV`, `DUST`, `ROUTINE`. The UV-risk warning is a separate boolean, not another enum value.
+- Environment enum: `UV`, `DUST_PM10`, `DUST_PM25`.
+- Java `LocalDateTime` values serialize as ISO local timestamps without a guaranteed timezone offset.
+- The frontend never sends `userId` for user-specific endpoints.
+
+Common error response:
+
+```json
+{
+  "timestamp": "2026-08-20T00:00:00Z",
+  "status": 400,
+  "code": "VALIDATION_ERROR",
+  "message": "field: validation message",
+  "path": "/api/..."
+}
+```
+
+Malformed JSON uses `INVALID_REQUEST_BODY`; missing/invalid query parameters use `INVALID_REQUEST_PARAMETER`; unexpected failures use `INTERNAL_SERVER_ERROR`. UI code should branch on `code`, not parse English `message` text.
+
+## Environment and home screen
+
+These five endpoints are implemented and unauthenticated, but live provider verification was not run in this audit.
+
+```http
+GET /api/location?lat=37.5172&lon=127.0473
+GET /api/environment/uv?sido=서울특별시&gugun=강남구
+GET /api/environment/dust?sido=서울특별시&gugun=강남구
+GET /api/environment/uv/by-location?lat=37.5172&lon=127.0473
+GET /api/environment/dust/by-location?lat=37.5172&lon=127.0473
+```
+
+Location response:
+
+```json
+{"sido":"서울특별시","gugun":"강남구","dong":"역삼동"}
+```
+
+Environment response item:
+
+```json
+{
+  "type": "UV",
+  "value": 5.0,
+  "level": "보통",
+  "region": "서울특별시 강남구",
+  "observedAt": "2026-08-20T12:00:00"
+}
+```
+
+Dust endpoints return an array containing PM10 and PM2.5 items. Direct environment errors do not fallback; show a retry/unavailable state for `INVALID_ENVIRONMENT_REQUEST`, `REGION_NOT_FOUND`, or `ENVIRONMENT_UPSTREAM_ERROR`.
+
+## AI recommendation screen
+
+Call after the user grants geolocation and after JWT integration:
+
+```http
+POST /api/ai-routines/recommend
+Content-Type: application/json
+Authorization: Bearer <JWT>
+
+{"latitude":37.5172,"longitude":127.0473}
+```
+
+Actual response DTO:
+
+```json
+{
+  "skinType": "건성",
+  "diagnosisResult": "세안 후 당김과 볼 부위 건조함",
+  "environment": {
+    "available": true,
+    "uvLevel": "높음",
+    "dustLevel": "좋음 / 보통"
+  },
+  "morning": [{"order":1,"name":"약산성 클렌저","detail":"부드럽게 세안"}],
+  "evening": [{"order":1,"name":"보습 크림","detail":"얇게 덧바르기"}],
+  "reasons": ["수분과 장벽 관리가 필요해요."]
+}
+```
+
+When any environment provider fails, the recommendation may still return 200 with:
+
+```json
+{"available":false,"uvLevel":null,"dustLevel":null}
+```
+
+Render the routine normally, hide environment grades, and show “환경 정보를 불러오지 못했어요” rather than treating this as total request failure. A missing diagnosis is a real 404 `DIAGNOSIS_RESULT_NOT_FOUND`; RAG/OpenAI failures are generally 502, and an absent key is 503 `OPENAI_NOT_CONFIGURED`.
+
+The recommendation is transient. On “체크리스트 저장하기”, send the displayed/selected items:
+
+```http
+POST /api/routines/from-ai
+
+{
+  "morning": [{"order":1,"name":"약산성 클렌저","detail":"부드럽게 세안"}],
+  "evening": [{"order":1,"name":"보습 크림","detail":"얇게 덧바르기"}]
+}
+```
+
+Each array allows 0..5 items, but both cannot be empty. Orders must be consecutive from 1. Names/details are limited to 20/30 characters. Saving appends non-duplicate items; it does not preserve reasons or environment data.
+
+## My routine screen
+
+On screen entry and whenever the selected date changes:
+
+```http
+GET /api/routines?date=2026-08-20
+```
+
+```json
+{
+  "date":"2026-08-20",
+  "morning":{"routineId":10,"type":"MORNING","items":[{"id":100,"name":"세안","detail":"미온수","done":true,"order":1}]},
+  "evening":{"routineId":11,"type":"EVENING","items":[]},
+  "memos":[{"id":20,"date":"2026-08-20","content":"선크림 구매","done":false,"createdAt":"...","updatedAt":"..."}],
+  "completedCount":1,
+  "totalCount":1,
+  "progressRate":100
+}
+```
+
+If `routineId` is null, create the group before adding an item:
+
+```http
+POST /api/routines                 {"type":"MORNING"}
+POST /api/routines/{routineId}/items {"name":"세안","detail":"미온수"}
+PATCH /api/routine-items/{itemId}    {"name":"세안","detail":"미온수로 부드럽게"}
+DELETE /api/routine-items/{itemId}
+PUT /api/routines/{routineId}/items/order {"itemIds":[103,101,102]}
+PUT /api/routine-items/{itemId}/completion {"date":"2026-08-20","completed":true}
+```
+
+Reordering must include every active item ID exactly once. Completion is date-specific; item edits/deletion are not.
+
+Care memo calls:
+
+```http
+POST /api/care-memos                       {"date":"2026-08-20","content":"선크림 구매"}
+PATCH /api/care-memos/{memoId}             {"content":"립밤 구매"}
+PUT /api/care-memos/{memoId}/completion    {"completed":true}
+DELETE /api/care-memos/{memoId}
+```
+
+## Notification screen
+
+On entry:
+
+```http
+GET /api/notifications
+```
+
+```json
+{
+  "notifications":[
+    {"notificationId":1,"type":"UV","enabled":true,"times":["09:00"],"createdAt":"...","updatedAt":"..."},
+    {"notificationId":null,"type":"DUST","enabled":false,"times":[],"createdAt":null,"updatedAt":null},
+    {"notificationId":null,"type":"ROUTINE","enabled":false,"times":[],"createdAt":null,"updatedAt":null}
+  ],
+  "uvRiskWarning":{"enabled":false,"createdAt":null,"updatedAt":null}
+}
+```
+
+- The response always contains `UV`, `DUST`, and `ROUTINE`; `notificationId=null` means that type has no database row yet.
+- Create a missing scheduled type: `POST /api/notifications` with `{"type":"UV","enabled":true,"times":["09:00"]}`.
+- Save an existing type: `PUT /api/notifications/{notificationId}` with the entire replacement `{"enabled":false,"times":[]}`.
+- Enabled settings require at least one `HH:mm` time; disabled settings may use an empty list.
+- Delete: `DELETE /api/notifications/{notificationId}`.
+- Save UV-risk warning: `PUT /api/notifications/uv-risk-warning` with `{"enabled":true}`.
+
+There are no add-time/remove-time endpoints; edit the local list and submit the whole list. Actual push delivery/scheduling is not implemented, so this screen currently manages preferences only.
+
+## Frontend dummy-data replacement map
+
+No frontend files were changed in this audit.
+
+| Frontend location | Current state | Replace/connect with |
+|---|---|---|
+| `src/data/diagnosisResult.ts` | Dummy diagnosis/recommendation | `POST /api/ai-routines/recommend`; diagnosis display itself has no backend endpoint in this repository |
+| `src/screens/RoutineRecommendationScreen.tsx` | Reads `DIAGNOSIS_RESULT`; save only navigates | recommendation POST, then `POST /api/routines/from-ai` |
+| `src/data/myRoutine.ts` | Dummy routine/memo state | `GET /api/routines` and routine/item/memo mutation endpoints |
+| `src/screens/MyRoutineScreen.tsx` | In-memory edits/completion | routine/item/order/completion/memo calls above |
+| `src/data/homeSummary.ts`, `src/screens/HomeScreen.tsx` | Dummy metrics | location + UV/dust by-location endpoints; adapt response to current card model |
+| notification UI | No matching screen found | build/connect to notification endpoints after auth integration |
+| `src/api/authApi.ts` | Dummy local accounts/token | external auth backend; no compatible auth endpoint exists here |
+| `src/auth/session.ts` | Stores dummy token/user | retain storage wrapper if desired, but attach real token to requests |
+| `src/api/chatApi.ts` | Uses diagnosis dummy data | no chat backend endpoint exists in this repository |
+
+The backend `ExampleController` endpoints are scaffold endpoints and should not be connected to product screens.

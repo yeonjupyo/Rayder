@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.likelion.backend.ai.diagnosis.DiagnosisResultMapper">
+	<select id="findLatestByUserId" resultType="com.likelion.backend.ai.diagnosis.DiagnosisResult">
+		SELECT result_id, user_id, skin_type, result_summary AS diagnosis_result, diagnosed_at
+		FROM DIAGNOSIS_RESULT WHERE user_id = #{userId}
+		ORDER BY diagnosed_at DESC, result_id DESC LIMIT 1
+	</select>
+</mapper>

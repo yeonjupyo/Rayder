@@ -35,6 +35,7 @@ dependencies {
 	implementation("org.springframework.boot:spring-boot-starter-jdbc")
 	implementation("org.mybatis.spring.boot:mybatis-spring-boot-starter:4.0.1")
 	runtimeOnly("org.mariadb.jdbc:mariadb-java-client:3.5.9")
+	implementation("org.apache.pdfbox:pdfbox:3.0.5")
 
 	// Ops / config
 	implementation("org.springframework.boot:spring-boot-starter-actuator")

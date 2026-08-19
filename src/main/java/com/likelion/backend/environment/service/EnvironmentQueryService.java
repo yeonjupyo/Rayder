@@ -5,6 +5,7 @@ import com.likelion.backend.environment.client.KakaoGeocodingClient;
 import com.likelion.backend.environment.client.KmaUvClient;
 import com.likelion.backend.environment.client.RegionResolver;
 import com.likelion.backend.environment.dto.EnvironmentInfo;
+import com.likelion.backend.environment.dto.UvForecastPoint;
 import com.likelion.backend.environment.util.SidoNameConverter;
 import java.util.List;
 import org.springframework.stereotype.Service;
@@ -27,6 +28,11 @@ public class EnvironmentQueryService {
 	public EnvironmentInfo getUv(String sido, String gugun) {
 		var code = regionResolver.resolve(sido, gugun);
 		return kmaUvClient.getUvIndex(code.areaNo(), label(code));
+	}
+
+	public List<UvForecastPoint> getUvForecast(String sido, String gugun) {
+		var code = regionResolver.resolve(sido, gugun);
+		return kmaUvClient.getUvForecast(code.areaNo());
 	}
 
 	public List<EnvironmentInfo> getDust(String sido, String gugun) {

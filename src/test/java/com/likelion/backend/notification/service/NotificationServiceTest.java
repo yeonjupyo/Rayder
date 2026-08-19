@@ -15,6 +15,7 @@ import com.likelion.backend.notification.domain.NotificationType;
 import com.likelion.backend.notification.dto.NotificationSettingRequest;
 import com.likelion.backend.notification.dto.NotificationUpdateRequest;
 import com.likelion.backend.notification.mapper.NotificationMapper;
+import com.likelion.backend.environment.client.RegionResolver;
 import java.time.LocalTime;
 import java.util.List;
 import java.util.Optional;
@@ -27,11 +28,12 @@ import org.mockito.junit.jupiter.MockitoExtension;
 @ExtendWith(MockitoExtension.class)
 class NotificationServiceTest {
 	@Mock NotificationMapper mapper;
+	@Mock RegionResolver regionResolver;
 	NotificationService service;
 
 	@BeforeEach
 	void setUp() {
-		service = new NotificationService(mapper);
+		service = new NotificationService(mapper, regionResolver);
 	}
 
 	@Test
@@ -44,9 +46,14 @@ class NotificationServiceTest {
 
 		var response = service.findAll(7L);
 
-		assertThat(response.notifications()).hasSize(1);
+		assertThat(response.notifications()).hasSize(3);
 		assertThat(response.notifications().get(0).times()).containsExactly("09:00");
-		assertThat(response.uvExposureWarning().enabled()).isFalse();
+		assertThat(response.notifications().get(1).type()).isEqualTo(NotificationType.DUST);
+		assertThat(response.notifications().get(1).notificationId()).isNull();
+		assertThat(response.notifications().get(1).enabled()).isFalse();
+		assertThat(response.notifications().get(1).times()).isEmpty();
+		assertThat(response.notifications().get(2).type()).isEqualTo(NotificationType.ROUTINE);
+		assertThat(response.uvRiskWarning().enabled()).isFalse();
 	}
 
 	@Test
@@ -90,6 +97,27 @@ class NotificationServiceTest {
 
 		verify(mapper).deleteTimes(1L);
 		verify(mapper, never()).insertTimes(anyLong(), any());
+	}
+
+	@Test
+	void rejectsEmptyTimeListWhenCreatingEnabledSetting() {
+		when(mapper.existsUser(7L)).thenReturn(true);
+		when(mapper.findByUserIdAndType(7L, NotificationType.UV)).thenReturn(Optional.empty());
+
+		assertThatThrownBy(() -> service.create(7L,
+			new NotificationSettingRequest(NotificationType.UV, true, List.of())))
+			.isInstanceOf(BusinessException.class)
+			.extracting("code").isEqualTo("NOTIFICATION_TIME_REQUIRED");
+	}
+
+	@Test
+	void rejectsEmptyTimeListWhenEnablingExistingSetting() {
+		when(mapper.findById(1L)).thenReturn(Optional.of(setting(1L, 7L, NotificationType.UV, false)));
+
+		assertThatThrownBy(() -> service.update(1L, 7L,
+			new NotificationUpdateRequest(true, List.of())))
+			.isInstanceOf(BusinessException.class)
+			.extracting("code").isEqualTo("NOTIFICATION_TIME_REQUIRED");
 	}
 
 	@Test

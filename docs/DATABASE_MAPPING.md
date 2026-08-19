@@ -17,9 +17,21 @@
 
 `NOTIFICATION_TIME` stores zero or more times for a scheduled setting. `UNIQUE(noti_id, alert_time)` rejects duplicate times, and its FK uses `ON DELETE CASCADE`.
 
-`NOTIFICATION_WARNING_SETTING` stores the independent cumulative UV-exposure warning preference. It is keyed by `user_id`, has no time setting, and is not one of the three scheduled notification types.
+`NOTIFICATION_WARNING_SETTING` stores the independent UV-risk warning preference. It is keyed by `user_id`, has no time setting, and is not one of the three scheduled notification types.
 
 The schema change is defined in `V3__normalize_notification_settings.sql`.
+
+## Notification delivery
+
+`DEVICE_TOKEN` stores one or more Expo push tokens per user. Unregistered or invalid tokens are retained as inactive rows.
+
+`NOTIFICATION_LOCATION` stores exactly one current, explicitly selected `sido`/`gugun` pair per user. It is not a location-history table.
+
+`NOTIFICATION_WARNING_DELIVERY` stores only UV-risk forecast delivery keys to suppress duplicate warnings. It does not contain a threshold, location history, outdoor activity, or personal UV dose.
+
+These tables are defined in the manually applied `V5__notification_delivery.sql` migration.
+
+`EXPO_PUSH_TICKET` stores Expo receipt IDs temporarily so delivery receipts can be checked. It contains no push-message body or personal location data.
 
 ## User routines
 
@@ -50,8 +62,9 @@ No AI recommendation table is added at this stage. There is no `AI_RECOMMENDATIO
 - `DIAGNOSIS_RESULT` is read only during generation. Historical rows are retained and one latest row is selected for the authenticated user; the table has no completion-status column.
 - Environment values are fetched through `EnvironmentQueryService` and are not persisted by this feature. Request coordinates are not stored as user-profile data.
 - RAG evidence and the OpenAI structured response remain transient.
-- On explicit save, only morning/evening items use existing `USER_ROUTINE` / `ROUTINE_ITEM` rows. Status summary, reasons, skin type, diagnosis, and environment values are not stored. `ROUTINE_ITEM.is_ai_recommended = 1` records provenance only.
-- Saved items use existing soft-delete/order behavior and `ROUTINE_ITEM_COMPLETION` for date-specific checks; they have no synchronization link to the earlier response.
+- Recommendation generation does not read or write `USER_ROUTINE`, `ROUTINE_ITEM`, or `ROUTINE_ITEM_COMPLETION`.
+- Only an explicit checklist-save request converts submitted items into ordinary routine data using existing `USER_ROUTINE` and `ROUTINE_ITEM` rows. `ROUTINE_ITEM.is_ai_recommended=1` is provenance metadata, not an AI-response or history relationship.
+- Status summary, reasons, diagnosis, environment values, retrieved evidence, and recommendation identifiers are never stored.
 
 The live MariaDB `DIAGNOSIS_RESULT` mapping is:
 
@@ -65,6 +78,8 @@ The live MariaDB `DIAGNOSIS_RESULT` mapping is:
 
 There is no completion-status or separate completion-time column, so every stored row is treated as completed. The latest result for a user is selected deterministically with `ORDER BY diagnosed_at DESC, result_id DESC LIMIT 1`. The existing indexes are the primary index on `result_id` and a non-unique FK index on `user_id`; there is currently no composite index matching the latest-result lookup. Do not add one merely for the design stage; assess it with query volume when implementing the mapper.
 
-Existing `UNIQUE(user_id, time_type)` means an AI batch save reuses an existing morning/evening routine or creates the missing one. New items append after the active maximum `step_order`. An item is skipped when an active item in the same time section has an exactly equal `item_name`; duplicate names inside the same request are also stored once. This is service-level validation rather than a global database uniqueness constraint because historical soft-deleted rows remain and uniqueness is scoped to active items and time type.
+The conversion reuses or creates the authenticated user's morning/evening `USER_ROUTINE`, then appends after the maximum active `step_order`. Active exact-name duplicates within the same time type and exact-name duplicates inside the request are skipped. The operation is transactional and does not replace existing items.
 
-AI save does not create completion rows. Completion starts independently per date when the existing completion endpoint upserts `ROUTINE_ITEM_COMPLETION`.
+Conversion creates no `ROUTINE_ITEM_COMPLETION` row. Once converted, the item follows the existing date-specific completion upsert exactly like a manually created routine item.
+
+The RAG vector index is transient and in-process. PDF chunks and OpenAI embeddings are cached in application memory only; no vector or recommendation table is introduced.
