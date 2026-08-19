@@ -8,4 +8,4 @@ data-go-kr:
 # 카카오 디벨로퍼스(https://developers.kakao.com)에서 애플리케이션 등록 후 발급되는
 # REST API 키. data.go.kr 키와는 완전히 별개.
 kakao:
-  rest-api-key: dbda10f8d52a8eeb8870ab5c00337a77
+  rest-api-key: ${KAKAO_REST_API_KEY}

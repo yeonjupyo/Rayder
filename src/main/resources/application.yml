@@ -19,3 +19,8 @@ management:
     web:
       exposure:
         include: health,info
+
+environment:
+  api:
+    data-go-kr-service-key: ${DATA_GO_KR_SERVICE_KEY}
+    kakao-rest-api-key: ${KAKAO_REST_API_KEY}

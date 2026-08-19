@@ -19,6 +19,8 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.bind.MissingServletRequestParameterException;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
 /**
  * Translates exceptions thrown anywhere in the request pipeline into a
@@ -70,6 +72,17 @@ public class GlobalExceptionHandler {
 			HttpStatus.BAD_REQUEST.value(), "INVALID_REQUEST_BODY", message, request.getRequestURI()
 		);
 		return ResponseEntity.badRequest().body(body);
+	}
+
+	@ExceptionHandler({MissingServletRequestParameterException.class, MethodArgumentTypeMismatchException.class})
+	public ResponseEntity<ErrorResponse> handleInvalidRequestParameter(
+		Exception ex, HttpServletRequest request
+	) {
+		String message = "Missing or invalid request parameter";
+		logFailedRequest(request, HttpStatus.BAD_REQUEST.value(), message);
+		return ResponseEntity.badRequest().body(ErrorResponse.of(
+			HttpStatus.BAD_REQUEST.value(), "INVALID_REQUEST_PARAMETER", message, request.getRequestURI()
+		));
 	}
 
 	@ExceptionHandler(Exception.class)
