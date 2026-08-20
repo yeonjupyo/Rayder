@@ -42,6 +42,9 @@ dependencies {
 	runtimeOnly("org.mariadb.jdbc:mariadb-java-client:3.5.9")
 	implementation("org.apache.pdfbox:pdfbox:3.0.5")
 
+	// 비밀번호 해싱만 필요해서 crypto 모듈만 쓴다(Security 필터 체인은 아직 없음).
+	implementation("org.springframework.security:spring-security-crypto")
+
 	// Ops / config
 	implementation("org.springframework.boot:spring-boot-starter-actuator")
 	developmentOnly("org.springframework.boot:spring-boot-devtools")

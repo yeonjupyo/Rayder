@@ -4,8 +4,31 @@
 
 <mapper namespace="com.likelion.backend.auth.mapper.UserMapper">
     <select id="getTestUser" resultType="com.likelion.backend.auth.dto.UserDto">
-        SELECT user_id AS userId, email, nickname, region
-        FROM USER
+        SELECT user_id AS userId, email, phone, nickname, region
+        FROM `USER`
         WHERE user_id = 1
     </select>
+
+    <select id="findById" resultType="com.likelion.backend.auth.dto.UserDto">
+        SELECT user_id AS userId, email, phone, nickname, region
+        FROM `USER`
+        WHERE user_id = #{userId}
+    </select>
+
+    <select id="findCredentialByIdentifier" resultType="com.likelion.backend.auth.dto.UserCredentialRow">
+        SELECT user_id AS userId, email, phone, nickname, region, password
+        FROM `USER`
+        WHERE phone = #{identifier} OR email = #{identifier}
+        ORDER BY user_id
+        LIMIT 1
+    </select>
+
+    <select id="existsByPhone" resultType="boolean">
+        SELECT EXISTS(SELECT 1 FROM `USER` WHERE phone = #{phone})
+    </select>
+
+    <insert id="insertUser" useGeneratedKeys="true" keyProperty="holder.userId">
+        INSERT INTO `USER` (phone, nickname, password)
+        VALUES (#{phone}, #{nickname}, #{password})
+    </insert>
 </mapper>

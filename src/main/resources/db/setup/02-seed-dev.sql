@@ -11,9 +11,13 @@
 -- ---------------------------------------------------------------------------
 -- 1. 테스트 사용자
 -- ---------------------------------------------------------------------------
-INSERT INTO `USER` (user_id, email, nickname, region)
-VALUES (1, 'test@example.com', '테스터', '서울특별시 강남구')
-ON DUPLICATE KEY UPDATE nickname = VALUES(nickname), region = VALUES(region);
+-- 로그인 정보: 휴대폰 01000000000 / 비밀번호 P@ssw0rd
+-- password 는 BCrypt 해시다. 개발용 계정이므로 그대로 두고, 운영 데이터에는 절대 쓰지 말 것.
+INSERT INTO `USER` (user_id, phone, email, nickname, region, password)
+VALUES (1, '01000000000', 'test@example.com', '테스터', '서울특별시 강남구',
+        '$2a$10$j4USdNRqbnQyzFUHKO2E0O4TeDTxH.r0PCcGsput5hPLuWVDrphPW')
+ON DUPLICATE KEY UPDATE phone = VALUES(phone), nickname = VALUES(nickname),
+                        region = VALUES(region), password = VALUES(password);
 
 -- ---------------------------------------------------------------------------
 -- 2. 스킨몽 외형 참조 데이터

@@ -18,14 +18,17 @@
 -- ---------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS `USER` (
     user_id    INT          NOT NULL AUTO_INCREMENT,
-    email      VARCHAR(255) NOT NULL,
-    -- 실제 로그인이 붙기 전까지는 사용되지 않는다. 붙일 때 해시(BCrypt)만 저장할 것.
+    -- 로그인 식별자는 휴대폰 번호(숫자만)다. 이메일은 선택 정보로 남겨둔다.
+    phone      VARCHAR(20)  NULL,
+    email      VARCHAR(255) NULL,
+    -- BCrypt 해시만 저장한다. 평문을 넣지 말 것.
     password   VARCHAR(255) NULL,
     nickname   VARCHAR(50)  NOT NULL,
     region     VARCHAR(100) NULL,
     created_at DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     PRIMARY KEY (user_id),
+    CONSTRAINT uk_user_phone UNIQUE (phone),
     CONSTRAINT uk_user_email UNIQUE (email)
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci;
 

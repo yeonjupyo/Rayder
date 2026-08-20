@@ -1,8 +1,12 @@
 package com.likelion.backend.auth.controller;
 
+import com.likelion.backend.auth.dto.LoginRequest;
+import com.likelion.backend.auth.dto.SignUpRequest;
 import com.likelion.backend.auth.dto.UserDto;
-import com.likelion.backend.auth.mapper.UserMapper;
+import com.likelion.backend.auth.service.AuthService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -11,11 +15,15 @@ import org.springframework.web.bind.annotation.*;
 @RequiredArgsConstructor
 public class UserController {
 
-    private final UserMapper userMapper;
+    private final AuthService authService;
+
+    @PostMapping("/signup")
+    public ResponseEntity<UserDto> signUp(@Valid @RequestBody SignUpRequest request) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(authService.signUp(request));
+    }
 
     @PostMapping("/login")
-    public ResponseEntity<UserDto> login() {
-        // DB의 1번 테스트 계정 정보를 가져와서 반환
-        return ResponseEntity.ok(userMapper.getTestUser());
+    public ResponseEntity<UserDto> login(@Valid @RequestBody LoginRequest request) {
+        return ResponseEntity.ok(authService.logIn(request));
     }
 }
