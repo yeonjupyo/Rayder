@@ -8,6 +8,17 @@ spring:
     hikari:
       maximum-pool-size: 10
       connection-timeout: 3000
+web:
+  cors:
+    # Vite dev server(5173) 와 preview(4173).
+    allowed-origins:
+      - http://localhost:5173
+      - http://localhost:4173
+auth:
+  dev:
+    # 임시 인증 브릿지. 실제 JWT 필터가 들어오면 제거한다. 운영 프로파일에서는 절대 켜지 않는다.
+    enabled: true
+    default-user-id: 1
 logging:
   level:
     com.likelion.backend: DEBUG
