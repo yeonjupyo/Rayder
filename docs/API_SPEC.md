@@ -6,8 +6,6 @@
 - 요청·응답 본문은 모두 JSON (`Content-Type: application/json`)
 - 시간대는 `Asia/Seoul` 기준
 
-문서 구성상 알림 / 루틴 / AI 추천 섹션은 작성 당시 영문 원문을 그대로 유지했다.
-
 ---
 
 ## 1. 공통 규약
@@ -307,13 +305,13 @@ LLM 을 쓰지 않는 **규칙 기반 응답**이다. 키워드 매칭 순서대
 
 ---
 
-# Notification API
+## 8. 알림 API
 
-All endpoints require authentication. The JWT authentication filter stores the token's user ID as a `Long` request attribute named `authenticatedUserId`.
+모든 엔드포인트는 인증이 필요하다. JWT 인증 필터가 토큰의 사용자 ID 를 `Long` 타입 요청 속성 `authenticatedUserId` 로 넣어주는 것을 전제로 한다(1.1 참고: 현재 미구현).
 
-Errors use the common body: `timestamp`, `status`, `code`, `message`, and `path`.
+오류는 1.2 의 공통 형식(`timestamp`, `status`, `code`, `message`, `path`)을 따른다.
 
-## List settings
+### 알림 설정 조회
 
 `GET /api/notifications` → `200 OK`
 
@@ -353,9 +351,9 @@ Errors use the common body: `timestamp`, `status`, `code`, `message`, and `path`
 }
 ```
 
-`notifications` always contains `UV`, `DUST`, and `ROUTINE` in that order. A type without a database row is returned as `notificationId=null`, `enabled=false`, `times=[]`, and null timestamps.
+`notifications` 는 항상 `UV`, `DUST`, `ROUTINE` 을 이 순서로 포함한다. DB 행이 없는 타입은 `notificationId=null`, `enabled=false`, `times=[]`, 타임스탬프 null 로 내려간다.
 
-## Create scheduled setting
+### 예약 알림 생성
 
 `POST /api/notifications` → `201 Created`
 
@@ -363,9 +361,9 @@ Errors use the common body: `timestamp`, `status`, `code`, `message`, and `path`
 {"type":"ROUTINE","enabled":true,"times":["08:00","21:00"]}
 ```
 
-Returns the created notification object. A duplicate user/type returns `409 NOTIFICATION_ALREADY_EXISTS`.
+생성된 알림 객체를 반환한다. 같은 사용자/타입이 이미 있으면 `409 NOTIFICATION_ALREADY_EXISTS`.
 
-## Replace scheduled setting
+### 예약 알림 교체
 
 `PUT /api/notifications/{notificationId}` → `200 OK`
 
@@ -373,15 +371,21 @@ Returns the created notification object. A duplicate user/type returns `409 NOTI
 {"enabled":false,"times":["09:00"]}
 ```
 
-The complete time list is replaced atomically. At least one time is required when `enabled=true`; `enabled=false` permits an empty list. Missing enabled times return `400 NOTIFICATION_TIME_REQUIRED`, duplicate times return `400 DUPLICATE_NOTIFICATION_TIME`, and invalid `HH:mm` values return `400 INVALID_NOTIFICATION_TIME`.
+시간 목록 전체를 원자적으로 교체한다. `enabled=true` 면 최소 한 개의 시간이 필요하고, `enabled=false` 면 빈 목록을 허용한다.
 
-## Delete scheduled setting
+| status | code | 상황 |
+|---|---|---|
+| 400 | `NOTIFICATION_TIME_REQUIRED` | `enabled=true` 인데 시간이 없음 |
+| 400 | `DUPLICATE_NOTIFICATION_TIME` | 시간 중복 |
+| 400 | `INVALID_NOTIFICATION_TIME` | `HH:mm` 형식 위반 |
+
+### 예약 알림 삭제
 
 `DELETE /api/notifications/{notificationId}` → `204 No Content`
 
-Missing settings return `404 NOTIFICATION_NOT_FOUND`; access by another user returns `403 NOTIFICATION_FORBIDDEN`.
+없는 설정은 `404 NOTIFICATION_NOT_FOUND`, 다른 사용자의 설정 접근은 `403 NOTIFICATION_FORBIDDEN`.
 
-## Update UV-risk warning
+### 자외선 위험 경보 on/off
 
 `PUT /api/notifications/uv-risk-warning` → `200 OK`
 
@@ -389,38 +393,40 @@ Missing settings return `404 NOTIFICATION_NOT_FOUND`; access by another user ret
 {"enabled":true}
 ```
 
-## Notification delivery location
+### 알림 발송 지역
 
-The service stores one explicitly selected current notification region per user. It does not retain location history or infer outdoor activity.
+사용자가 명시적으로 선택한 **현재 알림 지역 하나**만 저장한다. 위치 이력을 남기거나 야외 활동을 추론하지 않는다.
 
-- `GET /api/notifications/location` -> `200 OK` with `{"sido":"서울특별시","gugun":"강남구"}`, or an empty body when unset.
-- `PUT /api/notifications/location` -> `200 OK` with the normalized region. Body: `{"sido":"서울특별시","gugun":"강남구"}`.
+- `GET /api/notifications/location` → `200 OK`, `{"sido":"서울특별시","gugun":"강남구"}`. 미설정이면 빈 본문.
+- `PUT /api/notifications/location` → `200 OK`, 정규화된 지역을 반환. 요청 본문은 `{"sido":"서울특별시","gugun":"강남구"}`.
 
-The same region is used for scheduled UV, scheduled dust, and UV-risk warning delivery. ROUTINE delivery does not require a region.
+이 지역은 예약 UV, 예약 미세먼지, 자외선 위험 경보 발송에 공통으로 쓴다. ROUTINE 발송은 지역이 필요 없다.
 
-## Device tokens
+### 디바이스 토큰
 
-- `POST /api/notifications/devices` -> `204 No Content`. Body: `{"token":"ExpoPushToken[...]","platform":"ANDROID"}`.
-- `DELETE /api/notifications/devices` -> `204 No Content`. Body: `{"token":"ExpoPushToken[...]"}`.
+- `POST /api/notifications/devices` → `204 No Content`. 본문 `{"token":"ExpoPushToken[...]","platform":"ANDROID"}`
+- `DELETE /api/notifications/devices` → `204 No Content`. 본문 `{"token":"ExpoPushToken[...]"}`
 
-Platforms are `ANDROID`, `IOS`, and `WEB`. Registration is an upsert and reactivates a previously disabled token. Unregistration soft-disables the token.
+플랫폼은 `ANDROID`, `IOS`, `WEB`. 등록은 upsert 이며 이전에 비활성된 토큰을 다시 살린다. 해제는 soft disable 이다.
 
-## Delivery policy
+### 발송 정책
 
-- All schedules use `Asia/Seoul`.
-- UV sends the selected region's UV index and level at each configured time.
-- DUST sends PM10 and PM2.5 values and levels at each configured time.
-- ROUTINE sends a routine reminder at each configured time.
-- UV-risk warning checks KMA current/near-term forecast values and sends when the UV index is at least 6 (`높음`, `매우높음`, or `위험`). Users configure only the warning's enabled flag.
-- The backend stores a `(user_id, forecast_at)` delivery marker to prevent repeated delivery of the same UV forecast. It stores no personal UV dose or location history.
+- 모든 스케줄은 `Asia/Seoul` 기준이다.
+- UV: 설정한 시각마다 선택 지역의 자외선 지수와 등급을 보낸다.
+- DUST: 설정한 시각마다 PM10, PM2.5 값과 등급을 보낸다.
+- ROUTINE: 설정한 시각마다 루틴 리마인더를 보낸다.
+- 자외선 위험 경보: 기상청 현재/근시점 예보를 확인해 자외선 지수가 6 이상(`높음`, `매우높음`, `위험`)일 때 발송한다. 사용자는 on/off 만 설정한다.
+- 같은 예보에 대한 중복 발송을 막기 위해 `(user_id, forecast_at)` 발송 마커를 저장한다. 개인별 자외선 노출량이나 위치 이력은 저장하지 않는다.
 
-Expo Push delivery requires `EXPO_PUSH_ENABLED=true`. If enhanced push security is enabled in EAS, set `EXPO_ACCESS_TOKEN`; otherwise it may be empty. The backend sends tickets through Expo Push Service and checks receipts after at least 15 minutes. `DeviceNotRegistered` tokens are disabled automatically.
+Expo Push 발송에는 `EXPO_PUSH_ENABLED=true` 가 필요하다. EAS 에서 향상된 푸시 보안을 켰다면 `EXPO_ACCESS_TOKEN` 을 설정하고, 아니면 비워둬도 된다. 백엔드는 Expo Push Service 로 티켓을 보내고 최소 15분 후 receipt 를 확인한다. `DeviceNotRegistered` 토큰은 자동으로 비활성된다.
 
-# Routine API
+---
 
-All routine endpoints use the authenticated `authenticatedUserId`; clients never send a user ID.
+## 9. 루틴 · 케어메모 API
 
-## Read routines for a date
+모든 루틴 엔드포인트는 인증된 `authenticatedUserId` 를 사용한다. 클라이언트는 사용자 ID 를 보내지 않는다.
+
+### 날짜별 루틴 조회
 
 `GET /api/routines?date=2026-08-19` → `200 OK`
 
@@ -440,9 +446,9 @@ All routine endpoints use the authenticated `authenticatedUserId`; clients never
 }
 ```
 
-The completion join, counts, and rounded integer percentage are calculated by the backend. A missing morning or evening routine is returned with a `null` `routineId` and an empty item list. Invalid dates return `400 INVALID_DATE`.
+완료 여부 조인, 개수, 정수로 반올림한 진행률은 백엔드가 계산한다. 아침/저녁 루틴이 없으면 `routineId` 는 `null`, 항목은 빈 배열로 내려간다. 잘못된 날짜는 `400 INVALID_DATE`.
 
-## Create a routine
+### 루틴 생성
 
 `POST /api/routines` → `201 Created`
 
@@ -450,18 +456,18 @@ The completion join, counts, and rounded integer percentage are calculated by th
 {"type":"MORNING"}
 ```
 
-Only `MORNING` and `EVENING` are accepted. One routine per user/type is allowed; duplicates return `409 ROUTINE_ALREADY_EXISTS`.
+`MORNING`, `EVENING` 만 허용한다. 사용자/타입당 하나만 만들 수 있고 중복은 `409 ROUTINE_ALREADY_EXISTS`.
 
-## Manage items
+### 항목 관리
 
-- `POST /api/routines/{routineId}/items` with `{"name":"세안","detail":"미온수"}` → `201 Created`
-- `PATCH /api/routine-items/{itemId}` with the same fields → `200 OK`
+- `POST /api/routines/{routineId}/items` 본문 `{"name":"세안","detail":"미온수"}` → `201 Created`
+- `PATCH /api/routine-items/{itemId}` 같은 필드 → `200 OK`
 - `DELETE /api/routine-items/{itemId}` → `204 No Content` (soft delete)
-- `PUT /api/routines/{routineId}/items/order` with `{"itemIds":[103,101,102]}` → `200 OK`
+- `PUT /api/routines/{routineId}/items/order` 본문 `{"itemIds":[103,101,102]}` → `200 OK`
 
-An order request must contain every active item exactly once. Deleted items disappear from current queries but remain in the database.
+순서 변경 요청은 활성 항목 전체를 정확히 한 번씩 포함해야 한다. 삭제된 항목은 조회에서 사라지지만 DB 에는 남는다.
 
-## Set date-specific completion
+### 날짜별 완료 처리
 
 `PUT /api/routine-items/{itemId}/completion` → `200 OK`
 
@@ -469,31 +475,33 @@ An order request must contain every active item exactly once. Deleted items disa
 {"date":"2026-08-19","completed":true}
 ```
 
-The same endpoint sets `completed` back to `false`. `(item_id, completion_date)` is unique, so the operation updates rather than duplicates a record.
+같은 엔드포인트로 `completed=false` 로 되돌린다. `(item_id, completion_date)` 가 유니크라서 행이 중복되지 않고 갱신된다.
 
-## Care memos
+### 케어메모
 
-- Memos for the requested date are included in `GET /api/routines`.
-- `POST /api/care-memos` with `{"date":"2026-08-19","content":"선크림 구매"}` → `201 Created`
-- `PATCH /api/care-memos/{memoId}` with `{"content":"립밤 구매"}` → `200 OK`
-- `PUT /api/care-memos/{memoId}/completion` with `{"completed":true}` → `200 OK`
+- 요청 날짜의 메모는 `GET /api/routines` 응답에 포함된다.
+- `POST /api/care-memos` 본문 `{"date":"2026-08-19","content":"선크림 구매"}` → `201 Created`
+- `PATCH /api/care-memos/{memoId}` 본문 `{"content":"립밤 구매"}` → `200 OK`
+- `PUT /api/care-memos/{memoId}/completion` 본문 `{"completed":true}` → `200 OK`
 - `DELETE /api/care-memos/{memoId}` → `204 No Content`
 
-Cross-user routine, item, completion, and memo operations return `403`; missing resources return `404`.
+다른 사용자의 루틴 · 항목 · 완료 · 메모에 접근하면 `403`, 없는 리소스는 `404`.
 
-# AI routine recommendation API (implemented; live integration not yet verified)
+---
 
-All endpoints derive the user from authenticated `authenticatedUserId` (JWT integration boundary). Clients never send `userId`. Generated recommendations have no ID and are not persisted.
+## 10. AI 루틴 추천 API
 
-## Generate recommendation
+구현은 완료됐으나 실제 OpenAI 연동 검증은 아직 하지 않은 상태다. 사용자는 인증된 `authenticatedUserId` 에서 얻고 클라이언트는 `userId` 를 보내지 않는다. 생성된 추천은 ID 가 없고 저장되지 않는다.
 
-`POST /api/ai-routines/recommend` -> `200 OK`
+### 추천 생성
+
+`POST /api/ai-routines/recommend` → `200 OK`
 
 ```json
 {"latitude":37.5172,"longitude":127.0473}
 ```
 
-Coordinates are required request-scoped inputs for `EnvironmentQueryService`, not user-profile data. The service reads the authenticated user's latest `DIAGNOSIS_RESULT`, then combines it with UV, PM10, PM2.5, and later RAG context. It does not persist its output.
+좌표는 `EnvironmentQueryService` 호출에 필요한 요청 단위 입력이며 사용자 프로필 데이터가 아니다. 서비스는 인증 사용자의 최신 `DIAGNOSIS_RESULT` 를 읽고 자외선 · PM10 · PM2.5 와 RAG 컨텍스트를 합쳐 추천을 만든다. 결과는 저장하지 않는다.
 
 ```json
 {
@@ -510,17 +518,24 @@ Coordinates are required request-scoped inputs for `EnvironmentQueryService`, no
 }
 ```
 
-`skinType` is the `VARCHAR(20)` value from `DIAGNOSIS_RESULT.skin_type`; `diagnosisResult` is the nullable `VARCHAR(255)` value from `result_summary`. Since the table has no completion-status column, the latest row is selected by `user_id` with `ORDER BY diagnosed_at DESC, result_id DESC LIMIT 1`. Invalid/missing coordinates return `400`; no diagnosis returns `404 DIAGNOSIS_RESULT_NOT_FOUND`. If environment lookup fails, generation falls back to diagnosis plus RAG and returns `environment.available=false` without invented values.
+`skinType` 은 `DIAGNOSIS_RESULT.skin_type`(`VARCHAR(20)`), `diagnosisResult` 는 nullable 인 `result_summary`(`VARCHAR(255)`) 값이다. 테이블에 완료 상태 컬럼이 없어서 최신 행은 `user_id` 기준 `ORDER BY diagnosed_at DESC, result_id DESC LIMIT 1` 로 고른다.
 
-Response validation requires 1–5 morning items, 1–5 evening items, and at most 3 reasons. Names are 1–20 characters, details are 1–30 characters, and each section's order is consecutive from 1.
+| status | code | 상황 |
+|---|---|---|
+| 400 | (검증 오류) | 좌표 누락 또는 범위 초과 |
+| 404 | `DIAGNOSIS_RESULT_NOT_FOUND` | 진단 기록 없음 |
 
-## Read recommendation
+환경 조회가 실패하면 진단 결과와 RAG 만으로 생성하고 `environment.available=false` 로 응답한다. 값을 임의로 만들어 넣지 않는다.
 
-There is no recommendation read endpoint. Retrying generation creates a new transient response.
+응답 검증 규칙: 아침 1~5개, 저녁 1~5개, `reasons` 최대 3개. 이름은 1~20자, 상세는 1~30자, 각 섹션의 `order` 는 1부터 연속이어야 한다.
 
-## Save displayed recommendation as user routine
+### 추천 조회
 
-`POST /api/routines/from-ai` -> `201 Created`
+추천 조회 엔드포인트는 없다. 다시 생성하면 새로운 일회성 응답이 만들어진다.
+
+### 화면에 표시된 추천을 내 루틴으로 저장
+
+`POST /api/routines/from-ai` → `201 Created`
 
 ```json
 {
@@ -529,16 +544,16 @@ There is no recommendation read endpoint. Retrying generation creates a new tran
 }
 ```
 
-The request contains only the recommendation items currently displayed and selected for conversion. It contains no recommendation ID, reasons, diagnosis/environment data, or user ID. Both arrays cannot be empty simultaneously. Each has at most five items; names are required and at most 20 characters, details are required and at most 30 characters, and order is consecutive from 1.
+요청에는 화면에 표시되어 사용자가 저장하기로 선택한 항목만 담는다. 추천 ID, `reasons`, 진단/환경 데이터, 사용자 ID 는 포함하지 않는다. 두 배열이 동시에 비어 있을 수는 없다. 각 배열은 최대 5개, 이름은 필수 20자 이내, 상세는 필수 30자 이내, `order` 는 1부터 연속이어야 한다.
 
-This endpoint does not persist an AI recommendation and never calls OpenAI. In one transaction it converts the submitted items into ordinary user routine data: reuse or create each authenticated user's `USER_ROUTINE`, append to `ROUTINE_ITEM`, and skip exact-name duplicates in the same time section and request. Existing routine entries remain unchanged. No completion row is created; later checks use the existing date-specific completion endpoint.
+이 엔드포인트는 AI 추천을 저장하지도 않고 OpenAI 를 호출하지도 않는다. 한 트랜잭션 안에서 전달받은 항목을 일반 루틴 데이터로 변환한다. 인증 사용자의 `USER_ROUTINE` 을 재사용하거나 생성하고, `ROUTINE_ITEM` 에 이어붙이며, 같은 시간대·같은 요청 안에서 이름이 완전히 같은 항목은 건너뛴다. 기존 루틴 항목은 변경하지 않는다. 완료 행은 만들지 않으며 이후 체크는 기존 날짜별 완료 엔드포인트를 쓴다.
 
 ---
 
-## 8. 알려진 통합 이슈
+## 11. 알려진 통합 이슈
 
 1. **인증 미구현.** `authenticatedUserId` 를 세팅하는 필터가 없어 루틴 · 케어메모 · 알림 · AI 추천(22개 엔드포인트)은 현재 호출되지 않는다.
 2. **사용자 식별 방식 이원화.** 진단 · 스킨몽 · 홈 · 챗봇은 클라이언트가 `userId` 를 보낸다. 인증 도입 시 이 파라미터는 제거 대상이다.
 3. **에러 시맨틱.** 진단 · 스킨몽 · 홈 계열의 검증 실패가 모두 500 으로 나간다. `BusinessException` 을 상속한 예외로 바꿔야 400/404 로 구분된다.
 4. **홈 응답의 `dustIndex` 가 항상 null.** 7절의 미세먼지 API 와 연결되어 있지 않다.
-5. **`POST /api/auth/login` 이 평문 비밀번호를 반환한다.**
+5. **`POST /api/auth/login` 이 인증이 아니다.** 고정된 1번 계정을 그대로 반환하고 `password` 필드는 조회하지 않아 항상 null 이다. DTO 에서 이 필드를 제거해야 한다.
