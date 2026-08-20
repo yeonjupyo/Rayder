@@ -1,8 +1,8 @@
 spring:
   datasource:
-    url: ${DB_URL}
-    username: ${DB_USERNAME}
-    password: ${DB_PASSWORD}
+    url: jdbc:mariadb://112.168.140.200:3306/likelion
+    username: likelion
+    password: likelion_ym_02
     driver-class-name: org.mariadb.jdbc.Driver
     hikari:
       maximum-pool-size: 20

@@ -14,9 +14,34 @@
         WHERE skin_type = #{skinType} AND expression_type = #{expressionType}
     </select>
 
-    <insert id="insertSkinmon" useGeneratedKeys="true" keyProperty="holder.skinmonId">
+    <insert id="upsertSkinmon" useGeneratedKeys="true" keyProperty="holder.skinmonId">
         INSERT INTO SKINMON (user_id, result_id, skinmon_name, appearance_id)
         VALUES (#{userId}, #{resultId}, #{skinmonName}, #{appearanceId})
+        ON DUPLICATE KEY UPDATE
+                             result_id = VALUES(result_id),
+                             skinmon_name = VALUES(skinmon_name),
+                             appearance_id = VALUES(appearance_id),
+                             skinmon_id = LAST_INSERT_ID(skinmon_id)
     </insert>
+
+    <select id="findByUserId" resultType="com.likelion.backend.skinmon.dto.SkinmonCreateResponse">
+        SELECT s.skinmon_id AS skinmonId, s.skinmon_name AS skinmonName,
+               a.skin_type AS skinType, a.expression_type AS expressionType
+        FROM SKINMON s
+                 JOIN SKINMON_APPEARANCE a ON s.appearance_id = a.appearance_id
+        WHERE s.user_id = #{userId}
+    </select>
+
+    <select id="findBySkinmonId" resultType="com.likelion.backend.skinmon.dto.SkinmonCreateResponse">
+        SELECT s.skinmon_id AS skinmonId, s.skinmon_name AS skinmonName,
+               a.skin_type AS skinType, a.expression_type AS expressionType
+        FROM SKINMON s
+                 JOIN SKINMON_APPEARANCE a ON s.appearance_id = a.appearance_id
+        WHERE s.skinmon_id = #{skinmonId}
+    </select>
+
+    <update id="updateAppearance">
+        UPDATE SKINMON SET appearance_id = #{appearanceId} WHERE skinmon_id = #{skinmonId}
+    </update>
 
 </mapper>
