@@ -16,6 +16,10 @@ java {
 	}
 }
 
+springBoot {
+	mainClass.set("com.likelion.backend.BackendApplication")
+}
+
 configurations {
 	compileOnly {
 		extendsFrom(configurations.annotationProcessor.get())
@@ -29,6 +33,7 @@ repositories {
 dependencies {
 	// Web
 	implementation("org.springframework.boot:spring-boot-starter-web")
+	implementation("org.springframework.boot:spring-boot-starter-restclient")
 	implementation("org.springframework.boot:spring-boot-starter-validation")
 
 	// JDBC + MyBatis (MariaDB)

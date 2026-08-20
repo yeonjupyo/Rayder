@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.likelion.backend.home.mapper.HomeMapper">
+
+    <select id="findTodayUvStatus" resultType="com.likelion.backend.home.dto.DailyUvStatusRow">
+        SELECT uv_index AS uvIndex, dust_index AS dustIndex,
+               exposure_rate AS exposureRate, max_uv_today AS maxUvToday
+        FROM DAILY_UV_STATUS
+        WHERE user_id = #{userId} AND target_date = CURDATE()
+    </select>
+
+    <select id="findSkinTypeByUserId" resultType="String">
+        SELECT dr.skin_type
+        FROM SKINMON s
+                 JOIN DIAGNOSIS_RESULT dr ON s.result_id = dr.result_id
+        WHERE s.user_id = #{userId}
+    </select>
+
+    <insert id="upsertTodayUvStatus">
+        INSERT INTO DAILY_UV_STATUS (user_id, target_date, uv_index, exposure_rate, max_uv_today)
+        VALUES (#{userId}, CURDATE(), #{uvIndex}, #{exposureRate}, #{maxUvToday})
+        ON DUPLICATE KEY UPDATE
+                             uv_index = VALUES(uv_index),
+                             exposure_rate = VALUES(exposure_rate),
+                             max_uv_today = VALUES(max_uv_today)
+    </insert>
+
+</mapper>
