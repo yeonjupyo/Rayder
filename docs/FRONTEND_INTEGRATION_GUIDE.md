@@ -4,24 +4,44 @@ This guide describes the current backend code, not proposed endpoints. Backend b
 
 ## 로컬 연동 준비 (2026-08-21 갱신)
 
-1. **DB 생성.** USER · 진단 · 스킨몽 · 홈 · 챗봇 테이블은 어느 마이그레이션에도 생성문이 없었다. 전체 스키마와 시드를 `src/main/resources/db/setup/` 에 넣어뒀다.
+### DB
 
-   ```bash
-   mysql -u root -p -e "CREATE DATABASE hackathon DEFAULT CHARSET utf8mb4 COLLATE utf8mb4_unicode_ci"
-   mysql -u root -p hackathon < src/main/resources/db/setup/01-schema.sql
-   mysql -u root -p hackathon < src/main/resources/db/setup/02-seed-dev.sql
-   ```
+`src/main/resources/db/setup/` 에 세 개가 있다. 상황에 맞는 것만 쓴다.
 
-   시드는 1번 테스트 사용자, 스킨몽 외형 참조 데이터(없으면 `POST /api/skinmon` 이 항상 실패한다), 진단 결과 1건, 스킨몽 1마리, 아침·저녁 루틴, 케어메모, 알림 설정을 만든다. 이미 돌아가는 DB 가 있으면 `mysqldump --no-data` 로 뽑아 `01-schema.sql` 과 대조할 것.
+| 파일 | 용도 |
+|---|---|
+| `01-schema.sql` | 빈 DB 를 처음부터 만들 때. 모든 테이블을 최종 형태로 생성 |
+| `02-seed-dev.sql` | **빈 로컬 DB 전용** 시드. 테스트 계정·진단 결과·스킨몽·루틴·메모·알림 |
+| `03-server-delta.sql` | 이미 돌아가는 공용 서버 DB 에 회원가입/로그인을 적용하는 델타 |
 
-2. **백엔드 실행.** 공공 API 키는 필수다(없으면 기동 시점에 실패한다).
+공용 서버 DB(기본 스키마 `likelion`)는 대부분 이미 들어가 있다. 부족한 것만 델타로 적용한다.
 
-   ```bash
-   export DATA_GO_KR_SERVICE_KEY=... KAKAO_REST_API_KEY=...
-   ./gradlew bootRun
-   ```
+```bash
+mysql -h <db-host> -P 3306 -u <db-user> -p likelion \
+  < src/main/resources/db/setup/03-server-delta.sql
+```
 
-3. **프론트엔드 실행.** `frontend/.env.example` 을 `.env.local` 로 복사한다. 기본값은 `http://localhost:8080`.
+델타가 하는 일은 세 가지다. `USER` 에 `phone` 유니크 컬럼 추가, `email` 을 nullable 로 완화(회원가입이 이메일을 받지 않는다), 1번 테스트 계정의 평문 비밀번호를 BCrypt 해시로 교체(`01000000000` / `P@ssw0rd`). 요청 로그용 `request` 테이블도 없어서 함께 만든다.
+
+> `02-seed-dev.sql` 은 공용 서버에 쓰지 말 것. 빈 DB 기준이라 기존 `DIAGNOSIS_RESULT` 1번 행을 덮어써 스킨몽 외형과 어긋난다.
+
+### 백엔드 실행
+
+```bash
+export DB_URL='jdbc:mariadb://<db-host>:3306/likelion?useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Seoul'
+export DB_USERNAME=<db-user> DB_PASSWORD=<db-password>
+export DATA_GO_KR_SERVICE_KEY=... KAKAO_REST_API_KEY=...
+export OPENAI_API_KEY=...            # AI 추천을 쓸 때만
+./gradlew bootRun
+```
+
+공공 API 키가 없으면 기동 시점에 실패한다(의도된 동작). 자격증명은 저장소에 넣지 말고 셸이나 배포 환경의 시크릿으로만 주입한다.
+
+운영 프로파일(`SPRING_PROFILES_ACTIVE=prod`)은 위 `DB_*` 를 그대로 쓰고, 프론트를 다른 도메인에서 서빙하면 `WEB_CORS_ALLOWED_ORIGINS` 도 필요하다.
+
+### 프론트엔드 실행
+
+`frontend/.env.example` 을 `.env.local` 로 복사한다. 기본값은 `http://localhost:8080`.
 
 CORS 는 `web.cors.allowed-origins` 로 허용한다. 로컬 프로파일에 Vite dev(5173)·preview(4173)가 등록돼 있고, 다른 포트를 쓰면 `application-local.yml` 에 추가해야 한다.
 
