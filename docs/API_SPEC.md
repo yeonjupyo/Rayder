@@ -54,7 +54,9 @@
 | POST | `/api/auth/signup` | 회원가입 | - |
 | POST | `/api/auth/login` | 로그인 | - |
 | POST | `/api/diagnosis/submit` | 7문항 진단 저장 및 피부타입 판정 | userId 직접 전달 |
-| POST | `/api/skinmon` | 스킨몽 생성(이름 짓기) | userId 직접 전달 |
+| POST | `/api/skinmon` | 스킨몽 생성·갱신(이름 짓기) | userId 직접 전달 |
+| GET | `/api/skinmon/{userId}` | 스킨몽 조회 | userId 직접 전달 |
+| PATCH | `/api/skinmon/{skinmonId}/expression` | 표정 변경 | - |
 | GET | `/api/home` | 홈 화면 집계 | userId 직접 전달 |
 | POST | `/api/chat` | 규칙 기반 챗봇 | userId 직접 전달 |
 | GET | `/api/environment/uv` | 지역명 기준 자외선 지수 | - |
@@ -220,8 +222,29 @@
 |---|---|---|
 | 400 | `VALIDATION_ERROR` | `skinmonName` 누락 또는 20자 초과, `userId`/`resultId` 누락 |
 | 404 | `DIAGNOSIS_RESULT_NOT_FOUND` | `resultId` 에 해당하는 진단 결과 없음 |
-| 409 | (DB 제약) | 이미 스킨몽이 있는 사용자. `SKINMON.user_id` 가 유니크다 |
 | 500 | `SKINMON_APPEARANCE_NOT_FOUND` | 해당 피부타입/표정 외형이 `SKINMON_APPEARANCE` 에 없음(참조 데이터 준비 문제) |
+
+`SKINMON.user_id` 가 유니크라서 한 사용자당 한 마리다. 이미 있으면 upsert 로 이름·진단 결과·외형을 갱신하고, 표정은 기존 값을 유지한다(재진단 시나리오).
+
+### 스킨몽 조회
+
+`GET /api/skinmon/{userId}` → `200 OK`
+
+```json
+{"skinmonId": 5, "skinmonName": "몽이", "skinType": "건성", "expressionType": "happy"}
+```
+
+스킨몽이 없으면 `404 SKINMON_NOT_FOUND`.
+
+### 표정 변경
+
+`PATCH /api/skinmon/{skinmonId}/expression` → `200 OK`
+
+```json
+{"expressionType": "sad"}
+```
+
+`happy` / `sad` 만 허용한다. 그 외 값은 `400 VALIDATION_ERROR`, 외형 행이 없으면 `400 INVALID_SKINMON_EXPRESSION`, 없는 스킨몽은 `404 SKINMON_NOT_FOUND`.
 
 ---
 

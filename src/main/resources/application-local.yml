@@ -1,25 +1,29 @@
 spring:
   datasource:
-    # 로컬 기본값을 두고, 다른 DB 를 쓰면 환경변수로 덮어쓴다.
-    url: ${DB_URL:jdbc:mariadb://localhost:3306/hackathon?useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Seoul}
-    username: ${DB_USERNAME:hackathon}
-    password: ${DB_PASSWORD:hackathon}
+    # 팀 공용 서버 DB 가 기본값이다. 다른 DB 로 붙일 때는 환경변수로 덮어쓴다.
+    url: ${DB_URL:jdbc:mariadb://112.168.140.200:3306/likelion?useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Seoul}
+    username: ${DB_USERNAME:likelion}
+    password: ${DB_PASSWORD:likelion_ym_02}
     driver-class-name: org.mariadb.jdbc.Driver
     hikari:
-      maximum-pool-size: 10
+      maximum-pool-size: 20
       connection-timeout: 3000
+
 web:
   cors:
-    # Vite dev server(5173) 와 preview(4173).
+    # Vite dev server(5173) 와 preview(4173). 없으면 브라우저에서 호출이 막힌다.
     allowed-origins:
       - http://localhost:5173
       - http://localhost:4173
+
 auth:
   dev:
-    # 임시 인증 브릿지. 실제 JWT 필터가 들어오면 제거한다. 운영 프로파일에서는 절대 켜지 않는다.
+    # 임시 인증 브릿지. 실제 JWT 필터가 들어오면 제거한다.
     enabled: true
+    # Authorization 헤더가 없을 때 사용할 사용자.
     default-user-id: 1
+
 logging:
   level:
-    com.likelion.backend: DEBUG
-    org.mybatis: DEBUG
+    com.likelion.backend: INFO
+    org.mybatis: WARN

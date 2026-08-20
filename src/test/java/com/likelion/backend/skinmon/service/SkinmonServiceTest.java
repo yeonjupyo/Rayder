@@ -45,14 +45,14 @@ class SkinmonServiceTest {
 		doAnswer(invocation -> {
 			invocation.getArgument(4, GeneratedSkinmonId.class).setSkinmonId(7);
 			return null;
-		}).when(skinmonMapper).insertSkinmon(anyInt(), anyInt(), anyString(), anyInt(), any());
+		}).when(skinmonMapper).upsertSkinmon(anyInt(), anyInt(), anyString(), anyInt(), any());
 
 		SkinmonCreateResponse response = service().create(request());
 
 		assertThat(response.getSkinmonId()).isEqualTo(7);
 		assertThat(response.getSkinType()).isEqualTo("건성");
 		assertThat(response.getExpressionType()).isEqualTo("happy");
-		verify(skinmonMapper).insertSkinmon(org.mockito.ArgumentMatchers.eq(1),
+		verify(skinmonMapper).upsertSkinmon(org.mockito.ArgumentMatchers.eq(1),
 			org.mockito.ArgumentMatchers.eq(5), org.mockito.ArgumentMatchers.eq("몽이"),
 			org.mockito.ArgumentMatchers.eq(3), any());
 	}
@@ -65,7 +65,7 @@ class SkinmonServiceTest {
 			.isInstanceOf(BusinessException.class)
 			.hasFieldOrPropertyWithValue("status", HttpStatus.NOT_FOUND)
 			.hasFieldOrPropertyWithValue("code", "DIAGNOSIS_RESULT_NOT_FOUND");
-		verify(skinmonMapper, never()).insertSkinmon(anyInt(), anyInt(), anyString(), anyInt(), any());
+		verify(skinmonMapper, never()).upsertSkinmon(anyInt(), anyInt(), anyString(), anyInt(), any());
 	}
 
 	/** 참조 데이터 누락은 클라이언트가 고칠 수 없으므로 500 이지만 코드로 원인을 알린다. */
