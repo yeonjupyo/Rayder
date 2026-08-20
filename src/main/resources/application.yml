@@ -8,7 +8,9 @@ server:
   port: 8080
 
 mybatis:
-  mapper-locations: classpath*:mapper/*.xml
+  mapper-locations: classpath*:mapper/**/*.xml
+  # 두 트리에 UvForecastPoint 가 각각 있어 별칭이 충돌한다. XML 은 모두 FQCN 을 쓰므로
+  # 별칭 스캔은 com.likelion.backend 만 유지한다.
   type-aliases-package: com.likelion.backend
   configuration:
     map-underscore-to-camel-case: true
