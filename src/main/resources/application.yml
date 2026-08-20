@@ -8,7 +8,7 @@ server:
   port: 8080
 
 mybatis:
-  mapper-locations: classpath:mapper/**/*.xml
+  mapper-locations: classpath*:mapper/*.xml
   type-aliases-package: com.likelion.backend
   configuration:
     map-underscore-to-camel-case: true
@@ -19,3 +19,32 @@ management:
     web:
       exposure:
         include: health,info
+
+environment:
+  api:
+    data-go-kr-service-key: ${DATA_GO_KR_SERVICE_KEY}
+    kakao-rest-api-key: ${KAKAO_REST_API_KEY}
+
+ai:
+  openai:
+    api-key: ${OPENAI_API_KEY:}
+    base-url: https://api.openai.com
+    chat-model: gpt-4o-mini
+    embedding-model: text-embedding-3-small
+    connect-timeout: 3000
+    read-timeout: 30000
+    max-attempts: 2
+  rag:
+    resource: classpath:rag/Rayder_RAG.pdf
+    chunk-size: 900
+    chunk-overlap: 150
+    top-k: 4
+    minimum-similarity: 0.15
+
+notification:
+  zone-id: Asia/Seoul
+  expo:
+    enabled: ${EXPO_PUSH_ENABLED:false}
+    access-token: ${EXPO_ACCESS_TOKEN:}
+    send-url: https://exp.host/--/api/v2/push/send
+    receipts-url: https://exp.host/--/api/v2/push/getReceipts

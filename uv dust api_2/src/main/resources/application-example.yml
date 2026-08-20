@@ -1,0 +1,11 @@
+# 실제 서비스키는 여기에 직접 쓰지 말고 환경변수로 주입할 것.
+# 로컬 실행 시: application.yml 복사해서 만들고 .gitignore에 추가,
+# 또는 아래처럼 환경변수 참조 방식(${DATA_GO_KR_SERVICE_KEY})으로 유지.
+
+data-go-kr:
+  service-key: ${DATA_GO_KR_SERVICE_KEY}
+
+# 카카오 디벨로퍼스(https://developers.kakao.com)에서 애플리케이션 등록 후 발급되는
+# REST API 키. data.go.kr 키와는 완전히 별개.
+kakao:
+  rest-api-key: ${KAKAO_REST_API_KEY}

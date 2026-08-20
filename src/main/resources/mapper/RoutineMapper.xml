@@ -1,0 +1,94 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.likelion.backend.routine.mapper.RoutineMapper">
+	<resultMap id="routineMap" type="com.likelion.backend.routine.domain.UserRoutine">
+		<id property="routineId" column="routine_id"/>
+		<result property="userId" column="user_id"/>
+		<result property="type" column="time_type" javaType="com.likelion.backend.routine.domain.RoutineType"/>
+		<result property="createdAt" column="created_at"/>
+		<result property="updatedAt" column="updated_at"/>
+	</resultMap>
+	<resultMap id="itemMap" type="com.likelion.backend.routine.domain.RoutineItem">
+		<id property="itemId" column="item_id"/>
+		<result property="routineId" column="routine_id"/>
+		<result property="userId" column="user_id"/>
+		<result property="name" column="item_name"/>
+		<result property="detail" column="description"/>
+		<result property="stepOrder" column="step_order"/>
+		<result property="aiRecommended" column="is_ai_recommended"/>
+		<result property="completed" column="is_completed"/>
+		<result property="deletedAt" column="deleted_at"/>
+		<result property="createdAt" column="created_at"/>
+		<result property="updatedAt" column="updated_at"/>
+	</resultMap>
+	<resultMap id="memoMap" type="com.likelion.backend.routine.domain.CareMemo">
+		<id property="memoId" column="memo_id"/>
+		<result property="userId" column="user_id"/>
+		<result property="targetDate" column="target_date"/>
+		<result property="content" column="content"/>
+		<result property="completed" column="is_completed"/>
+		<result property="createdAt" column="created_at"/>
+		<result property="updatedAt" column="updated_at"/>
+	</resultMap>
+
+	<select id="existsUser" resultType="boolean">SELECT EXISTS(SELECT 1 FROM `USER` WHERE user_id = #{userId})</select>
+	<select id="findRoutinesByUserId" resultMap="routineMap">
+		SELECT routine_id, user_id, time_type, created_at, updated_at FROM USER_ROUTINE
+		WHERE user_id = #{userId} ORDER BY FIELD(time_type, 'MORNING', 'EVENING')
+	</select>
+	<select id="findRoutineById" resultMap="routineMap">
+		SELECT routine_id, user_id, time_type, created_at, updated_at FROM USER_ROUTINE WHERE routine_id = #{routineId}
+	</select>
+	<select id="findRoutineByUserIdAndType" resultMap="routineMap">
+		SELECT routine_id, user_id, time_type, created_at, updated_at FROM USER_ROUTINE
+		WHERE user_id = #{userId} AND time_type = #{type}
+	</select>
+	<insert id="insertRoutine" useGeneratedKeys="true" keyProperty="routineId" keyColumn="routine_id">
+		INSERT INTO USER_ROUTINE (user_id, time_type) VALUES (#{userId}, #{type})
+	</insert>
+	<select id="findItemsForDate" resultMap="itemMap">
+		SELECT i.item_id, i.routine_id, r.user_id, i.item_name, i.description, i.step_order,
+			i.is_ai_recommended, COALESCE(c.is_completed, 0) AS is_completed,
+			i.deleted_at, i.created_at, i.updated_at
+		FROM ROUTINE_ITEM i JOIN USER_ROUTINE r ON r.routine_id = i.routine_id
+		LEFT JOIN ROUTINE_ITEM_COMPLETION c ON c.item_id = i.item_id AND c.completion_date = #{date}
+		WHERE i.routine_id = #{routineId} AND i.deleted_at IS NULL ORDER BY i.step_order, i.item_id
+	</select>
+	<select id="findActiveItems" resultMap="itemMap">
+		SELECT i.item_id, i.routine_id, r.user_id, i.item_name, i.description, i.step_order,
+			i.is_ai_recommended, 0 AS is_completed, i.deleted_at, i.created_at, i.updated_at
+		FROM ROUTINE_ITEM i JOIN USER_ROUTINE r ON r.routine_id = i.routine_id
+		WHERE i.routine_id = #{routineId} AND i.deleted_at IS NULL ORDER BY i.step_order, i.item_id
+	</select>
+	<select id="findItemById" resultMap="itemMap">
+		SELECT i.item_id, i.routine_id, r.user_id, i.item_name, i.description, i.step_order,
+			i.is_ai_recommended, 0 AS is_completed, i.deleted_at, i.created_at, i.updated_at
+		FROM ROUTINE_ITEM i JOIN USER_ROUTINE r ON r.routine_id = i.routine_id WHERE i.item_id = #{itemId}
+	</select>
+	<insert id="insertItem" useGeneratedKeys="true" keyProperty="itemId" keyColumn="item_id">
+		INSERT INTO ROUTINE_ITEM (routine_id, item_name, description, step_order, is_ai_recommended)
+		VALUES (#{routineId}, #{name}, #{detail}, #{stepOrder}, #{aiRecommended})
+	</insert>
+	<update id="updateItem">UPDATE ROUTINE_ITEM SET item_name = #{name}, description = #{detail} WHERE item_id = #{itemId} AND deleted_at IS NULL</update>
+	<update id="softDeleteItem">UPDATE ROUTINE_ITEM SET deleted_at = CURRENT_TIMESTAMP WHERE item_id = #{itemId} AND deleted_at IS NULL</update>
+	<update id="moveItemTemporarily">UPDATE ROUTINE_ITEM SET step_order = #{stepOrder} WHERE item_id = #{itemId}</update>
+	<update id="updateItemOrder">UPDATE ROUTINE_ITEM SET step_order = #{stepOrder} WHERE item_id = #{itemId} AND deleted_at IS NULL</update>
+	<insert id="upsertCompletion">
+		INSERT INTO ROUTINE_ITEM_COMPLETION (item_id, completion_date, is_completed)
+		VALUES (#{itemId}, #{date}, #{completed})
+		ON DUPLICATE KEY UPDATE is_completed = VALUES(is_completed)
+	</insert>
+	<select id="findMemos" resultMap="memoMap">
+		SELECT memo_id, user_id, target_date, content, is_completed, created_at, updated_at
+		FROM CARE_MEMO WHERE user_id = #{userId} AND target_date = #{date} ORDER BY memo_id
+	</select>
+	<select id="findMemoById" resultMap="memoMap">
+		SELECT memo_id, user_id, target_date, content, is_completed, created_at, updated_at FROM CARE_MEMO WHERE memo_id = #{memoId}
+	</select>
+	<insert id="insertMemo" useGeneratedKeys="true" keyProperty="memoId" keyColumn="memo_id">
+		INSERT INTO CARE_MEMO (user_id, target_date, content) VALUES (#{userId}, #{targetDate}, #{content})
+	</insert>
+	<update id="updateMemoContent">UPDATE CARE_MEMO SET content = #{content} WHERE memo_id = #{memoId}</update>
+	<update id="updateMemoCompletion">UPDATE CARE_MEMO SET is_completed = #{completed} WHERE memo_id = #{memoId}</update>
+	<delete id="deleteMemo">DELETE FROM CARE_MEMO WHERE memo_id = #{memoId}</delete>
+</mapper>

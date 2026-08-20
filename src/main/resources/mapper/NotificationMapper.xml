@@ -1,0 +1,141 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.likelion.backend.notification.mapper.NotificationMapper">
+
+	<resultMap id="settingResultMap" type="com.likelion.backend.notification.domain.NotificationSetting">
+		<id property="notificationId" column="noti_id"/>
+		<result property="userId" column="user_id"/>
+		<result property="type" column="noti_type" javaType="com.likelion.backend.notification.domain.NotificationType"/>
+		<result property="enabled" column="is_active"/>
+		<result property="createdAt" column="created_at"/>
+		<result property="updatedAt" column="updated_at"/>
+	</resultMap>
+
+	<resultMap id="warningResultMap" type="com.likelion.backend.notification.domain.NotificationWarningSetting">
+		<id property="userId" column="user_id"/>
+		<result property="enabled" column="is_active"/>
+		<result property="createdAt" column="created_at"/>
+		<result property="updatedAt" column="updated_at"/>
+	</resultMap>
+
+	<select id="existsUser" resultType="boolean">
+		SELECT EXISTS(SELECT 1 FROM `USER` WHERE user_id = #{userId})
+	</select>
+
+	<select id="findAllByUserId" resultMap="settingResultMap">
+		SELECT noti_id, user_id, noti_type, is_active, created_at, updated_at
+		FROM NOTIFICATION_SETTING WHERE user_id = #{userId}
+		ORDER BY FIELD(noti_type, 'UV', 'DUST', 'ROUTINE')
+	</select>
+
+	<select id="findById" resultMap="settingResultMap">
+		SELECT noti_id, user_id, noti_type, is_active, created_at, updated_at
+		FROM NOTIFICATION_SETTING WHERE noti_id = #{notificationId}
+	</select>
+
+	<select id="findByUserIdAndType" resultMap="settingResultMap">
+		SELECT noti_id, user_id, noti_type, is_active, created_at, updated_at
+		FROM NOTIFICATION_SETTING
+		WHERE user_id = #{userId} AND noti_type = #{type}
+	</select>
+
+	<select id="findTimes" resultType="java.time.LocalTime">
+		SELECT alert_time FROM NOTIFICATION_TIME
+		WHERE noti_id = #{notificationId} ORDER BY alert_time
+	</select>
+
+	<insert id="insertSetting" parameterType="com.likelion.backend.notification.domain.NotificationSetting"
+		useGeneratedKeys="true" keyProperty="notificationId" keyColumn="noti_id">
+		INSERT INTO NOTIFICATION_SETTING (user_id, noti_type, is_active)
+		VALUES (#{userId}, #{type}, #{enabled})
+	</insert>
+
+	<update id="updateSetting" parameterType="com.likelion.backend.notification.domain.NotificationSetting">
+		UPDATE NOTIFICATION_SETTING SET is_active = #{enabled} WHERE noti_id = #{notificationId}
+	</update>
+
+	<delete id="deleteSetting">
+		DELETE FROM NOTIFICATION_SETTING WHERE noti_id = #{notificationId}
+	</delete>
+
+	<delete id="deleteTimes">
+		DELETE FROM NOTIFICATION_TIME WHERE noti_id = #{notificationId}
+	</delete>
+
+	<insert id="insertTimes">
+		INSERT INTO NOTIFICATION_TIME (noti_id, alert_time) VALUES
+		<foreach collection="times" item="time" separator=",">
+			(#{notificationId}, #{time})
+		</foreach>
+	</insert>
+
+	<select id="findWarningByUserId" resultMap="warningResultMap">
+		SELECT user_id, is_active, created_at, updated_at
+		FROM NOTIFICATION_WARNING_SETTING WHERE user_id = #{userId}
+	</select>
+
+	<insert id="upsertWarning">
+		INSERT INTO NOTIFICATION_WARNING_SETTING (user_id, is_active)
+		VALUES (#{userId}, #{enabled})
+		ON DUPLICATE KEY UPDATE is_active = VALUES(is_active)
+	</insert>
+
+	<insert id="upsertDeviceToken">
+		INSERT INTO DEVICE_TOKEN (user_id, token, platform, is_active)
+		VALUES (#{userId}, #{token}, #{platform}, 1)
+		ON DUPLICATE KEY UPDATE user_id = VALUES(user_id), platform = VALUES(platform), is_active = 1
+	</insert>
+
+	<update id="deactivateDeviceToken">
+		UPDATE DEVICE_TOKEN SET is_active = 0 WHERE user_id = #{userId} AND token = #{token}
+	</update>
+
+	<update id="deactivateToken">
+		UPDATE DEVICE_TOKEN SET is_active = 0 WHERE token = #{token}
+	</update>
+
+	<insert id="upsertLocation">
+		INSERT INTO NOTIFICATION_LOCATION (user_id, sido, gugun) VALUES (#{userId}, #{sido}, #{gugun})
+		ON DUPLICATE KEY UPDATE sido = VALUES(sido), gugun = VALUES(gugun)
+	</insert>
+
+	<select id="findLocation" resultType="com.likelion.backend.notification.mapper.NotificationMapper$Location">
+		SELECT sido, gugun FROM NOTIFICATION_LOCATION WHERE user_id = #{userId}
+	</select>
+
+	<select id="findDueScheduledTargets" resultType="com.likelion.backend.notification.mapper.NotificationMapper$DeliveryTarget">
+		SELECT ns.user_id, ns.noti_type AS type, dt.token, nl.sido, nl.gugun
+		FROM NOTIFICATION_SETTING ns
+		JOIN NOTIFICATION_TIME nt ON nt.noti_id = ns.noti_id
+		JOIN DEVICE_TOKEN dt ON dt.user_id = ns.user_id AND dt.is_active = 1
+		LEFT JOIN NOTIFICATION_LOCATION nl ON nl.user_id = ns.user_id
+		WHERE ns.is_active = 1 AND nt.alert_time = #{time}
+	</select>
+
+	<select id="findWarningTargets" resultType="com.likelion.backend.notification.mapper.NotificationMapper$WarningTarget">
+		SELECT nws.user_id, dt.token, nl.sido, nl.gugun
+		FROM NOTIFICATION_WARNING_SETTING nws
+		JOIN DEVICE_TOKEN dt ON dt.user_id = nws.user_id AND dt.is_active = 1
+		JOIN NOTIFICATION_LOCATION nl ON nl.user_id = nws.user_id
+		WHERE nws.is_active = 1
+	</select>
+
+	<insert id="insertWarningDeliveryIfAbsent">
+		INSERT IGNORE INTO NOTIFICATION_WARNING_DELIVERY (user_id, forecast_at)
+		VALUES (#{userId}, #{forecastAt})
+	</insert>
+
+	<insert id="insertExpoPushTicket">
+		INSERT INTO EXPO_PUSH_TICKET (receipt_id, token) VALUES (#{receiptId}, #{token})
+	</insert>
+
+	<select id="findPendingExpoPushTickets" resultType="com.likelion.backend.notification.mapper.NotificationMapper$ExpoTicket">
+		SELECT receipt_id, token FROM EXPO_PUSH_TICKET
+		WHERE checked_at IS NULL AND created_at &lt;= DATE_SUB(NOW(), INTERVAL 15 MINUTE)
+		ORDER BY created_at LIMIT 1000
+	</select>
+
+	<update id="markExpoPushTicketChecked">
+		UPDATE EXPO_PUSH_TICKET SET checked_at = NOW() WHERE receipt_id = #{receiptId}
+	</update>
+</mapper>
