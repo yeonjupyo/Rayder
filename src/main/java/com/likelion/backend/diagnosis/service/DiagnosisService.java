@@ -53,10 +53,12 @@ public class DiagnosisService {
             skinType = dryScore > oilyScore ? "건성" : "지성";
         }
 
-        // 3. 결과 저장
+        // 3. 결과 저장. result_summary 에는 설명 문구를 넣어 AI 추천이 그대로 입력으로 쓸 수 있게 한다.
+        DiagnosisConstants.Copy copy = DiagnosisConstants.copyOf(skinType);
         GeneratedResultId holder = new GeneratedResultId();
-        diagnosisMapper.insertResult(request.getUserId(), skinType, skinType + " 진단 결과", holder);
+        diagnosisMapper.insertResult(request.getUserId(), skinType, copy.description(), holder);
 
-        return new DiagnosisSubmitResponse(holder.getResultId(), skinType + "피부");
+        return new DiagnosisSubmitResponse(
+                holder.getResultId(), skinType + "피부", copy.keywords(), copy.description());
     }
 }
