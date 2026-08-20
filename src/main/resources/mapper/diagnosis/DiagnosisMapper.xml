@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.likelion.backend.diagnosis.mapper.DiagnosisMapper">
+
+    <insert id="insertAnswers">
+        INSERT INTO DIAGNOSIS_ANSWER (user_id, question_no, question_content, answer_value)
+        VALUES
+        <foreach collection="list" item="a" separator=",">
+            (#{a.userId}, #{a.questionNo}, #{a.questionContent}, #{a.answerValue})
+        </foreach>
+    </insert>
+
+    <insert id="insertResult" useGeneratedKeys="true" keyProperty="holder.resultId">
+        INSERT INTO DIAGNOSIS_RESULT (user_id, skin_type, result_summary)
+        VALUES (#{userId}, #{skinType}, #{resultSummary})
+    </insert>
+
+</mapper>

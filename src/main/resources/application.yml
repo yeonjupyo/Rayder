@@ -8,8 +8,7 @@ server:
   port: 8080
 
 mybatis:
-  mapper-locations: classpath*:mapper/*.xml
-  type-aliases-package: com.likelion.backend
+  mapper-locations: classpath*:mapper/**/*.xml
   configuration:
     map-underscore-to-camel-case: true
     call-setters-on-nulls: true
