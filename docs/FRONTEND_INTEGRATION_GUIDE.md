@@ -13,6 +13,7 @@ This guide describes the current backend code, not proposed endpoints. Backend b
 | `01-schema.sql` | 빈 DB 를 처음부터 만들 때. 모든 테이블을 최종 형태로 생성 |
 | `02-seed-dev.sql` | **빈 로컬 DB 전용** 시드. 테스트 계정·진단 결과·스킨몽·루틴·메모·알림 |
 | `03-server-delta.sql` | 이미 돌아가는 공용 서버 DB 에 회원가입/로그인을 적용하는 델타 |
+| `04-review-account.sql` | 심사용 계정(`testuser` / `testuser`)과 시연용 초기 데이터 |
 
 공용 서버 DB(기본 스키마 `likelion`)는 대부분 이미 들어가 있다. 부족한 것만 델타로 적용한다.
 
@@ -24,6 +25,19 @@ mysql -h <db-host> -P 3306 -u <db-user> -p likelion \
 델타가 하는 일은 세 가지다. `USER` 에 `phone` 유니크 컬럼 추가, `email` 을 nullable 로 완화(회원가입이 이메일을 받지 않는다), 1번 테스트 계정의 평문 비밀번호를 BCrypt 해시로 교체(`01000000000` / `P@ssw0rd`). 요청 로그용 `request` 테이블도 없어서 함께 만든다.
 
 > `02-seed-dev.sql` 은 공용 서버에 쓰지 말 것. 빈 DB 기준이라 기존 `DIAGNOSIS_RESULT` 1번 행을 덮어써 스킨몽 외형과 어긋난다.
+
+### 심사용 계정
+
+제출 양식에 적는 값이다. `04-review-account.sql` 이 이 계정과 시연용 데이터(진단 결과, 스킨몽, 아침·저녁 루틴 7개 항목, 케어메모, UV 알림 09:00, 자외선 경보)를 함께 만든다.
+
+```
+ID: testuser
+PW: testuser
+```
+
+로그인 식별자는 휴대폰 번호 또는 이메일 컬럼으로 조회하므로, 전화번호가 아닌 로그인 아이디는 `email` 컬럼에 담았다. 심사 중 데이터가 망가지면 같은 스크립트를 다시 실행하면 초기 상태로 돌아온다.
+
+**심사 기간에는 배포 환경에서 `AUTH_DEV_ENABLED=true` 가 필요하다.** 이 값이 꺼져 있으면 루틴 · 케어메모 · 알림 · AI 화면이 `authenticatedUserId` 를 받지 못해 실패한다. 토큰을 검증하지 않는 임시 브릿지이므로 심사가 끝나면 다시 끄고 JWT 로 교체할 것.
 
 ### 백엔드 실행
 

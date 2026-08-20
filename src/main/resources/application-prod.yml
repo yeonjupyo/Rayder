@@ -15,6 +15,14 @@ web:
     # 예: WEB_CORS_ALLOWED_ORIGINS=https://rayder.example.com,https://www.rayder.example.com
     allowed-origins: ${WEB_CORS_ALLOWED_ORIGINS:}
 
+auth:
+  dev:
+    # 토큰을 검증하지 않는 임시 브릿지다. 기본은 꺼져 있고, 이 상태에서는 루틴 · 케어메모 ·
+    # 알림 · AI 엔드포인트가 authenticatedUserId 를 못 받아 실패한다.
+    # 심사 기간처럼 JWT 없이 전체 화면을 보여줘야 할 때만 AUTH_DEV_ENABLED=true 로 켠다.
+    enabled: ${AUTH_DEV_ENABLED:false}
+    default-user-id: ${AUTH_DEV_DEFAULT_USER_ID:1}
+
 logging:
   level:
     com.likelion.backend: INFO
