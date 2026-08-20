@@ -1,14 +1,14 @@
 spring:
   datasource:
-    url: ${DB_URL}
-    username: ${DB_USERNAME}
-    password: ${DB_PASSWORD}
+    # 로컬 기본값을 두고, 다른 DB 를 쓰면 환경변수로 덮어쓴다.
+    url: ${DB_URL:jdbc:mariadb://localhost:3306/hackathon?useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Seoul}
+    username: ${DB_USERNAME:hackathon}
+    password: ${DB_PASSWORD:hackathon}
     driver-class-name: org.mariadb.jdbc.Driver
     hikari:
-      maximum-pool-size: 20
+      maximum-pool-size: 10
       connection-timeout: 3000
-
 logging:
   level:
-    com.likelion.backend: INFO
-    org.mybatis: WARN
+    com.likelion.backend: DEBUG
+    org.mybatis: DEBUG
