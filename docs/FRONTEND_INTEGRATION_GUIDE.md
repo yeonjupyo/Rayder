@@ -2,17 +2,42 @@
 
 This guide describes the current backend code, not proposed endpoints. Backend base URL is `http://localhost:8080` by default. Prefer a frontend environment variable such as `VITE_API_BASE_URL` instead of embedding it in components.
 
-## Integration blocker: authentication
+## 로컬 연동 준비 (2026-08-21 갱신)
 
-All notification, routine, care-memo, and AI endpoints require backend request attribute `authenticatedUserId`. The intended frontend header is:
+1. **DB 생성.** USER · 진단 · 스킨몽 · 홈 · 챗봇 테이블은 어느 마이그레이션에도 생성문이 없었다. 전체 스키마와 시드를 `src/main/resources/db/setup/` 에 넣어뒀다.
 
-```http
-Authorization: Bearer <JWT>
-```
+   ```bash
+   mysql -u root -p -e "CREATE DATABASE hackathon DEFAULT CHARSET utf8mb4 COLLATE utf8mb4_unicode_ci"
+   mysql -u root -p hackathon < src/main/resources/db/setup/01-schema.sql
+   mysql -u root -p hackathon < src/main/resources/db/setup/02-seed-dev.sql
+   ```
 
-However, this repository currently has no JWT filter/security configuration that validates the header and creates that attribute. Do not send `userId` in a body or query parameter, and do not ship a workaround header. These endpoints become callable from the frontend only after the authentication module is merged. Environment endpoints do not require authentication.
+   시드는 1번 테스트 사용자, 스킨몽 외형 참조 데이터(없으면 `POST /api/skinmon` 이 항상 실패한다), 진단 결과 1건, 스킨몽 1마리, 아침·저녁 루틴, 케어메모, 알림 설정을 만든다. 이미 돌아가는 DB 가 있으면 `mysqldump --no-data` 로 뽑아 `01-schema.sql` 과 대조할 것.
 
-The current frontend `src/api/authApi.ts` is fully dummy/local-storage based and produces a dummy token; it is not compatible with the backend contract.
+2. **백엔드 실행.** 공공 API 키는 필수다(없으면 기동 시점에 실패한다).
+
+   ```bash
+   export DATA_GO_KR_SERVICE_KEY=... KAKAO_REST_API_KEY=...
+   ./gradlew bootRun
+   ```
+
+3. **프론트엔드 실행.** `frontend/.env.example` 을 `.env.local` 로 복사한다. 기본값은 `http://localhost:8080`.
+
+CORS 는 `web.cors.allowed-origins` 로 허용한다. 로컬 프로파일에 Vite dev(5173)·preview(4173)가 등록돼 있고, 다른 포트를 쓰면 `application-local.yml` 에 추가해야 한다.
+
+## 인증: 임시 개발용 브릿지
+
+알림 · 루틴 · 케어메모 · AI 엔드포인트는 요청 속성 `authenticatedUserId` 를 읽는데, 이를 채우는 JWT 필터가 아직 없어서 호출 자체가 불가능했다. 연동을 막지 않기 위해 임시 브릿지(`DevAuthenticationFilter`)를 넣었다.
+
+- `auth.dev.enabled=true` 일 때만 등록되고, 로컬 프로파일에서만 켜져 있다. 운영에서는 절대 켜지 않는다.
+- **토큰을 검증하지 않는다.** 사용자는 `Authorization: Bearer dev.<userId>....` 의 userId → `X-Dev-User-Id` 헤더 → `auth.dev.default-user-id`(기본 1) 순서로 정한다.
+- 프론트는 `POST /api/auth/login` 응답의 `userId` 로 `dev.<userId>.<timestamp>` 토큰을 만들어 저장하고, 모든 요청에 `Authorization: Bearer` 로 실어 보낸다.
+
+실제 JWT 필터가 들어오면 이 필터는 삭제하고 프론트의 토큰 생성부만 교체하면 된다. 헤더 전송 방식은 그대로 유지된다.
+
+`POST /api/auth/login` 자체도 아직 인증이 아니다. 자격증명을 검증하지 않고 1번 테스트 계정을 그대로 반환하므로, 프론트의 회원가입은 계정을 로컬에 저장한 뒤 이 엔드포인트로 세션을 받는다.
+
+진단 · 스킨몽 · 홈 · 챗봇은 여전히 `userId` 를 쿼리/본문으로 받는다. 인증이 붙으면 이 파라미터는 제거 대상이고, 프론트의 `src/api/userContext.ts` 도 같이 삭제하면 된다.
 
 ## Shared contracts
 

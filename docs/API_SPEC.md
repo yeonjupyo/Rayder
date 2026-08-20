@@ -192,12 +192,15 @@
 
 ### 홈 화면 조회
 
-`GET /api/home?userId=1&areaNo=1168000000` → `200 OK`
+`GET /api/home?userId=1&sido=서울특별시&gugun=강남구` → `200 OK`
 
-| 파라미터 | 타입 | 설명 |
-|---|---|---|
-| `userId` | int | 사용자 ID |
-| `areaNo` | string | 기상청 동네예보 지점코드. `RegionResolver`(`kma-area-codes.csv`)로 구·군명에서 얻는다 |
+| 파라미터 | 타입 | 필수 | 설명 |
+|---|---|---|---|
+| `userId` | int | O | 사용자 ID |
+| `sido`, `gugun` | string | 조건부 | 지역명. 서버가 `kma-area-codes.csv` 로 지점코드를 찾는다. 클라이언트 권장 방식 |
+| `areaNo` | string | 조건부 | 기상청 동네예보 지점코드를 직접 지정 |
+
+`areaNo` 또는 `sido`+`gugun` 중 하나는 있어야 한다. 둘 다 없으면 `400 INVALID_REQUEST_PARAMETER`.
 
 ```json
 {
@@ -208,12 +211,14 @@
   "skinType": "건성",
   "expressionType": "happy",
   "hourlyForecast": [
-    {"hourOffset": 0, "value": 3.0},
-    {"hourOffset": 3, "value": 5.0},
-    {"hourOffset": 6, "value": 7.0}
+    {"hourOffset": 0, "forecastAt": "2026-08-21T09:00:00", "value": 3.0},
+    {"hourOffset": 3, "forecastAt": "2026-08-21T12:00:00", "value": 5.0},
+    {"hourOffset": 6, "forecastAt": "2026-08-21T15:00:00", "value": 7.0}
   ]
 }
 ```
+
+`forecastAt` 은 각 구간의 절대 시각이다. 클라이언트는 이 값으로 그래프 x축 라벨을 만든다(`hourOffset` 만으로는 발표시각을 몰라 시각 라벨을 만들 수 없다).
 
 계산 규칙:
 
