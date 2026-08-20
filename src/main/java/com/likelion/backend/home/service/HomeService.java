@@ -55,7 +55,7 @@ public class HomeService {
             if (hourOffset > FORECAST_WINDOW_HOURS) {
                 break;
             }
-            hourlyForecast.add(new UvForecastPoint(hourOffset, point.value()));
+            hourlyForecast.add(new UvForecastPoint(hourOffset, point.forecastAt(), point.value()));
 
             BigDecimal value = BigDecimal.valueOf(point.value());
             if (value.compareTo(maxUvToday) > 0) {
