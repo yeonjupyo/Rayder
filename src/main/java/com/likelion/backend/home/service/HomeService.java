@@ -4,8 +4,10 @@ import com.likelion.backend.home.dto.DailyUvStatusRow;
 import com.likelion.backend.home.dto.HomeResponse;
 import com.likelion.backend.home.dto.UvForecastPoint;
 import com.likelion.backend.environment.client.KmaUvClient;
+import com.likelion.backend.common.exception.BusinessException;
 import com.likelion.backend.home.mapper.HomeMapper;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
@@ -36,7 +38,8 @@ public class HomeService {
     public HomeResponse getHome(int userId, String areaNo) {
         String skinType = homeMapper.findSkinTypeByUserId(userId);
         if (skinType == null) {
-            throw new IllegalStateException("스킨몽이 아직 생성되지 않았습니다: userId=" + userId);
+            throw new BusinessException("SKINMON_NOT_FOUND",
+                    "스킨몽이 아직 생성되지 않았습니다: userId=" + userId, HttpStatus.NOT_FOUND);
         }
 
         // KmaUvClient 는 발표시각 기준 절대시각(forecastAt)으로 h0~h75 를 준다.

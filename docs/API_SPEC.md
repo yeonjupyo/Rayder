@@ -45,7 +45,7 @@
 
 실패한 요청은 `REQUEST` 로그 테이블에도 기록된다.
 
-> 진단 · 스킨몽 · 홈 · 챗봇 서비스는 `IllegalArgumentException` / `IllegalStateException` 을 던지므로 전부 마지막 줄에 걸려 **500** 이 된다. 원인 메시지는 응답에 나오지 않고 서버 로그에만 남는다. 400/404 로 내려야 할 케이스는 아래 각 절에 표시했다.
+요청 본문은 Bean Validation 으로 먼저 걸러진다(`VALIDATION_ERROR`, 메시지는 `필드: 사유` 형태). 그 다음 도메인 검증은 `BusinessException` 이라 상태·코드가 케이스별로 다르다. `INTERNAL_SERVER_ERROR` 는 예상하지 못한 실패에만 남는다.
 
 ### 1.3 엔드포인트 인덱스
 
@@ -191,10 +191,10 @@
 
 오류:
 
-| 상황 | 현재 응답 | 바람직한 응답 |
+| status | code | 상황 |
 |---|---|---|
-| `answers` 가 null이거나 7개가 아님 | 500 `INTERNAL_SERVER_ERROR` | 400 |
-| 허용되지 않는 답변 문자열 | 500 `INTERNAL_SERVER_ERROR` | 400 |
+| 400 | `VALIDATION_ERROR` | `answers` 누락, 7개가 아님, 빈 문자열 포함, `userId` 누락 |
+| 400 | `INVALID_DIAGNOSIS_ANSWERS` | 허용되지 않는 답변 문자열 (몇 번째 답변인지 메시지에 포함) |
 
 ---
 
@@ -216,10 +216,12 @@
 
 오류:
 
-| 상황 | 현재 응답 | 바람직한 응답 |
+| status | code | 상황 |
 |---|---|---|
-| `resultId` 에 해당하는 진단 결과 없음 | 500 `INTERNAL_SERVER_ERROR` | 404 |
-| 해당 피부타입/표정 외형이 `SKINMON_APPEARANCE` 에 없음 | 500 `INTERNAL_SERVER_ERROR` | 500 (데이터 준비 문제) |
+| 400 | `VALIDATION_ERROR` | `skinmonName` 누락 또는 20자 초과, `userId`/`resultId` 누락 |
+| 404 | `DIAGNOSIS_RESULT_NOT_FOUND` | `resultId` 에 해당하는 진단 결과 없음 |
+| 409 | (DB 제약) | 이미 스킨몽이 있는 사용자. `SKINMON.user_id` 가 유니크다 |
+| 500 | `SKINMON_APPEARANCE_NOT_FOUND` | 해당 피부타입/표정 외형이 `SKINMON_APPEARANCE` 에 없음(참조 데이터 준비 문제) |
 
 ---
 
@@ -269,10 +271,12 @@
 
 오류:
 
-| 상황 | 현재 응답 | 바람직한 응답 |
+| status | code | 상황 |
 |---|---|---|
-| 해당 사용자의 스킨몽이 없음 | 500 `INTERNAL_SERVER_ERROR` | 404 |
-| 기상청 API 실패 | 502 `ENVIRONMENT_UPSTREAM_ERROR` | 동일 |
+| 400 | `INVALID_REQUEST_PARAMETER` | `areaNo` 도 `sido`+`gugun` 도 없음 |
+| 400 | `REGION_NOT_FOUND` | `kma-area-codes.csv` 에 없는 지역명 |
+| 404 | `SKINMON_NOT_FOUND` | 해당 사용자의 스킨몽이 없음 |
+| 502 | `ENVIRONMENT_UPSTREAM_ERROR` | 기상청 API 실패 |
 
 ---
 
@@ -594,6 +598,6 @@ Expo Push 발송에는 `EXPO_PUSH_ENABLED=true` 가 필요하다. EAS 에서 향
 
 1. **인증 미구현.** `authenticatedUserId` 를 세팅하는 필터가 없어 루틴 · 케어메모 · 알림 · AI 추천(22개 엔드포인트)은 현재 호출되지 않는다.
 2. **사용자 식별 방식 이원화.** 진단 · 스킨몽 · 홈 · 챗봇은 클라이언트가 `userId` 를 보낸다. 인증 도입 시 이 파라미터는 제거 대상이다.
-3. **에러 시맨틱.** 진단 · 스킨몽 · 홈 계열의 검증 실패가 모두 500 으로 나간다. `BusinessException` 을 상속한 예외로 바꿔야 400/404 로 구분된다.
+3. ~~에러 시맨틱~~ **해결됨.** 진단 · 스킨몽 · 홈 · 챗봇의 검증 실패가 400/404 로 구분되고, 요청 본문은 Bean Validation 으로 먼저 걸러진다.
 4. **홈 응답의 `dustIndex` 가 항상 null.** 7절의 미세먼지 API 와 연결되어 있지 않다.
 5. **`POST /api/auth/login` 이 인증이 아니다.** 고정된 1번 계정을 그대로 반환하고 `password` 필드는 조회하지 않아 항상 null 이다. DTO 에서 이 필드를 제거해야 한다.

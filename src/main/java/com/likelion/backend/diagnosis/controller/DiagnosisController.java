@@ -3,6 +3,7 @@ package com.likelion.backend.diagnosis.controller;
 import com.likelion.backend.diagnosis.dto.DiagnosisSubmitRequest;
 import com.likelion.backend.diagnosis.dto.DiagnosisSubmitResponse;
 import com.likelion.backend.diagnosis.service.DiagnosisService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -15,7 +16,7 @@ public class DiagnosisController {
     private final DiagnosisService diagnosisService;
 
     @PostMapping("/submit")
-    public ResponseEntity<DiagnosisSubmitResponse> submit(@RequestBody DiagnosisSubmitRequest request) {
+    public ResponseEntity<DiagnosisSubmitResponse> submit(@Valid @RequestBody DiagnosisSubmitRequest request) {
         return ResponseEntity.ok(diagnosisService.submit(request));
     }
 }

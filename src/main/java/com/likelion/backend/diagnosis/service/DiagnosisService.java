@@ -2,8 +2,10 @@ package com.likelion.backend.diagnosis.service;
 
 import com.likelion.backend.diagnosis.constant.DiagnosisConstants;
 import com.likelion.backend.diagnosis.dto.*;
+import com.likelion.backend.common.exception.BusinessException;
 import com.likelion.backend.diagnosis.mapper.DiagnosisMapper;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import java.util.ArrayList;
@@ -19,8 +21,9 @@ public class DiagnosisService {
     @Transactional
     public DiagnosisSubmitResponse submit(DiagnosisSubmitRequest request) {
         List<String> answers = request.getAnswers();
-        if (answers == null || answers.size() != 7) {
-            throw new IllegalArgumentException("답변은 7개여야 합니다.");
+        if (answers == null || answers.size() != DiagnosisConstants.QUESTIONS.size()) {
+            throw new BusinessException("INVALID_DIAGNOSIS_ANSWERS",
+                    "답변은 " + DiagnosisConstants.QUESTIONS.size() + "개여야 합니다.", HttpStatus.BAD_REQUEST);
         }
 
         // 1. 답변 저장
@@ -36,7 +39,7 @@ public class DiagnosisService {
         diagnosisMapper.insertAnswers(rows);
 
         // 2. 점수 계산
-        int[] s = answers.stream().mapToInt(DiagnosisConstants::scoreOf).toArray();
+        int[] s = scoresOf(answers);
         int sensitiveScore = s[1] + s[2];    // 2,3번
         int combinationScore = s[4];          // 5번
         int dryScore = s[3] + s[5];           // 4,6번
@@ -60,5 +63,19 @@ public class DiagnosisService {
 
         return new DiagnosisSubmitResponse(
                 holder.getResultId(), skinType + "피부", copy.keywords(), copy.description());
+    }
+
+    /** 허용되지 않은 답변 문자열은 클라이언트 입력 오류이므로 400 으로 내린다. */
+    private int[] scoresOf(List<String> answers) {
+        int[] scores = new int[answers.size()];
+        for (int i = 0; i < answers.size(); i++) {
+            try {
+                scores[i] = DiagnosisConstants.scoreOf(answers.get(i));
+            } catch (IllegalArgumentException ex) {
+                throw new BusinessException("INVALID_DIAGNOSIS_ANSWERS",
+                        (i + 1) + "번 답변이 올바르지 않습니다: " + answers.get(i), HttpStatus.BAD_REQUEST);
+            }
+        }
+        return scores;
     }
 }

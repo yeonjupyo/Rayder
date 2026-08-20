@@ -25,6 +25,17 @@ class HomeServiceTest {
     @Mock KmaUvClient kmaUvClient;
     @InjectMocks HomeService homeService;
 
+    /** 스킨몽이 없으면 클라이언트가 먼저 만들어야 하므로 404 로 알린다. */
+    @Test
+    void answersNotFoundWhenTheUserHasNoSkinmon() {
+        when(homeMapper.findSkinTypeByUserId(1)).thenReturn(null);
+
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> homeService.getHome(1, "1168000000"))
+                .isInstanceOf(com.likelion.backend.common.exception.BusinessException.class)
+                .hasFieldOrPropertyWithValue("status", org.springframework.http.HttpStatus.NOT_FOUND)
+                .hasFieldOrPropertyWithValue("code", "SKINMON_NOT_FOUND");
+    }
+
     /**
      * KmaUvClient 는 3시간 간격으로 h0~h75(3일치)를 준다. 홈 응답은 발표시각 기준 오프셋으로
      * 하루치(0~24h)만 담아야 하고, 노출량은 이미 지난 구간만 누적해야 한다.
