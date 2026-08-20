@@ -1,7 +1,7 @@
 package com.example.uvmate.environment.client;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 import com.example.uvmate.dto.UvForecastPoint;
 import com.example.uvmate.environment.config.EnvironmentApiConfig;
 import com.example.uvmate.environment.dto.EnvironmentInfo;
@@ -49,7 +49,7 @@ public class KmaUvClient {
     public EnvironmentInfo getUvIndex(String areaNo, String regionLabel) {
         String time = LocalDateTime.now().minusHours(3).format(TIME_FORMAT);
 
-        URI uri = UriComponentsBuilder.fromHttpUrl(BASE_URL)
+        URI uri = UriComponentsBuilder.fromUriString(BASE_URL)
                 .queryParam("serviceKey", apiConfig.getServiceKey())
                 .queryParam("pageNo", 1)
                 .queryParam("numOfRows", 10)
@@ -100,7 +100,7 @@ public class KmaUvClient {
     public List<UvForecastPoint> getUvForecastToday(String areaNo) {
         String time = LocalDateTime.now().minusHours(3).format(TIME_FORMAT);
 
-        URI uri = UriComponentsBuilder.fromHttpUrl(BASE_URL)
+        URI uri = UriComponentsBuilder.fromUriString(BASE_URL)
                 .queryParam("serviceKey", apiConfig.getServiceKey())
                 .queryParam("pageNo", 1)
                 .queryParam("numOfRows", 10)

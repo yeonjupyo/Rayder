@@ -1,7 +1,7 @@
 package com.example.uvmate.environment.client;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 import com.example.uvmate.environment.config.EnvironmentApiConfig;
 import com.example.uvmate.environment.dto.EnvironmentInfo;
 import com.example.uvmate.environment.exception.EnvironmentApiException;
@@ -98,7 +98,7 @@ public class AirKoreaDustClient {
         // 중요: serviceKey에 +, = 문자가 포함돼 있어서 build().encode()로
         // 퍼센트 인코딩 필수. 안 하면 서버가 에러코드 30을 던짐
         // ("서비스키를 URL 인코딩하지 않음" - 문서 2장 OpenAPI 에러코드정리 참고).
-        URI uri = UriComponentsBuilder.fromHttpUrl(BASE_URL)
+        URI uri = UriComponentsBuilder.fromUriString(BASE_URL)
                 .queryParam("serviceKey", apiConfig.getServiceKey())
                 .queryParam("returnType", "json")
                 .queryParam("numOfRows", 100)

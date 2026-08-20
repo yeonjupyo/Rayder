@@ -1,7 +1,7 @@
 package com.example.uvmate.environment.client;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 import com.example.uvmate.environment.exception.EnvironmentApiException;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpEntity;
@@ -48,7 +48,7 @@ public class KakaoGeocodingClient {
      * @param lon 경도 (x)
      */
     public GeoRegion resolveRegion(double lat, double lon) {
-        URI uri = UriComponentsBuilder.fromHttpUrl(BASE_URL)
+        URI uri = UriComponentsBuilder.fromUriString(BASE_URL)
                 .queryParam("x", lon)
                 .queryParam("y", lat)
                 .build()
