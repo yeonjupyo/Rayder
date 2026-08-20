@@ -51,7 +51,8 @@
 
 | Method | Path | 설명 | 인증 |
 |---|---|---|---|
-| POST | `/api/auth/login` | 테스트 계정 조회 | - |
+| POST | `/api/auth/signup` | 회원가입 | - |
+| POST | `/api/auth/login` | 로그인 | - |
 | POST | `/api/diagnosis/submit` | 7문항 진단 저장 및 피부타입 판정 | userId 직접 전달 |
 | POST | `/api/skinmon` | 스킨몽 생성(이름 짓기) | userId 직접 전달 |
 | GET | `/api/home` | 홈 화면 집계 | userId 직접 전달 |
@@ -90,25 +91,52 @@
 
 ## 2. 인증 API
 
-### 로그인 (테스트용)
+로그인 식별자는 **휴대폰 번호(숫자만)** 이고, 비밀번호는 BCrypt 해시로만 저장한다. 시드 계정은 이메일로도 로그인된다. 토큰은 아직 발급하지 않는다(1.1 참고).
+
+### 회원가입
+
+`POST /api/auth/signup` → `201 Created`
+
+```json
+{"name": "테스터", "phone": "01012345678", "password": "P@ssw0rd"}
+```
+
+| 필드 | 제약 |
+|---|---|
+| `name` | 2~50자 |
+| `phone` | `0` 으로 시작하는 숫자 10~11자리 (하이픈 제거해서 전송) |
+| `password` | 8~72자 |
+
+응답은 아래 로그인과 같은 형태다. 오류:
+
+| status | code | 상황 |
+|---|---|---|
+| 400 | `VALIDATION_ERROR` | 형식 위반 |
+| 409 | `DUPLICATE_PHONE` | 이미 가입된 번호 |
+
+### 로그인
 
 `POST /api/auth/login` → `200 OK`
 
-요청 본문 없음. `USER` 테이블의 1번 테스트 계정을 그대로 반환한다.
+```json
+{"identifier": "01012345678", "password": "P@ssw0rd"}
+```
+
+`identifier` 는 휴대폰 번호 또는 이메일이다. 비밀번호 불일치와 존재하지 않는 계정을 **같은 응답**(`401 INVALID_CREDENTIALS`)으로 처리해 계정 존재 여부를 노출하지 않는다.
 
 ```json
 {
   "userId": 1,
   "email": "test@example.com",
-  "password": null,
+  "phone": "01000000000",
   "nickname": "테스터",
   "region": "서울특별시 강남구"
 }
 ```
 
-조회 쿼리는 `SELECT user_id, email, nickname, region FROM USER WHERE user_id = 1` 이다. DTO 에 `password` 필드가 남아 있지만 조회하지 않으므로 응답에서는 항상 `null` 이다.
+응답에 비밀번호는 담기지 않는다. 개발 시드 계정은 `01000000000` / `P@ssw0rd` 다.
 
-> 실제 인증이 아니다. 자격증명 검증도, 토큰 발급도 하지 않는다. JWT 도입 시 이 엔드포인트는 교체 대상이며 `password` 필드도 DTO 에서 제거해야 한다.
+> 토큰을 발급하지 않는다. 클라이언트는 `userId` 로 개발용 세션 토큰(`dev.<userId>.<timestamp>`)을 만들어 `Authorization: Bearer` 로 보내고, 서버는 `DevAuthenticationFilter` 가 그것을 읽는다. JWT 를 붙일 때 `AuthService` 가 토큰을 발급하도록 바꾸면 된다.
 
 ---
 
@@ -142,8 +170,15 @@
 응답:
 
 ```json
-{"resultId": 12, "skinType": "건성피부"}
+{
+  "resultId": 12,
+  "skinType": "건성피부",
+  "keywords": ["푸석함", "건조함"],
+  "description": "피부의 유분과 수분이 부족해 세안 후 당김이나 건조함을 쉽게 느낄 수 있어요."
+}
 ```
+
+`keywords` 와 `description` 은 판정된 피부타입별 고정 카피(`DiagnosisConstants.copyOf`)다. 결과 화면이 이 값을 그대로 렌더링한다.
 
 판정 순서 (먼저 만족하는 조건에서 확정):
 
@@ -152,7 +187,7 @@
 3. \|건성 점수(4번+6번) − 지성 점수(1번+7번)\| ≤ 2 → `복합성`
 4. 그 외 → 건성 점수가 크면 `건성`, 아니면 `지성`
 
-저장 결과: `DIAGNOSIS_ANSWER` 에 7행, `DIAGNOSIS_RESULT` 에 1행(`result_summary` = `"<타입> 진단 결과"`). 응답의 `skinType` 은 판정값에 `"피부"` 를 붙인 표시용 문자열이고, DB `skin_type` 에는 접미사 없이 저장된다.
+저장 결과: `DIAGNOSIS_ANSWER` 에 7행, `DIAGNOSIS_RESULT` 에 1행(`result_summary` = 위 `description`). 응답의 `skinType` 은 판정값에 `"피부"` 를 붙인 표시용 문자열이고, DB `skin_type` 에는 접미사 없이 저장된다. AI 추천은 `result_summary` 를 진단 요약 입력으로 읽는다.
 
 오류:
 

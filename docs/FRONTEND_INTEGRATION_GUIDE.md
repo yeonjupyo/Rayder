@@ -223,21 +223,22 @@ There are no add-time/remove-time endpoints; edit the local list and submit the 
 | 화면 / 모듈 | 상태 | 사용하는 엔드포인트 |
 |---|---|---|
 | `src/api/client.ts` | 연동 완료 | 공용. `VITE_API_BASE_URL`, Bearer 헤더 자동 첨부 |
-| `src/api/authApi.ts` | 연동 완료(백엔드가 임시) | `POST /api/auth/login`. 자격증명 검증 없음, 1번 계정 반환. 회원가입은 로컬 저장 후 로그인 |
+| `src/api/authApi.ts` | 연동 완료 | `POST /api/auth/signup`, `POST /api/auth/login`. BCrypt 검증. 토큰은 아직 없음 |
 | `src/screens/DiagnosisQuizScreen.tsx` | 연동 완료 | `POST /api/diagnosis/submit` |
-| `src/screens/DiagnosisResultScreen.tsx` | 부분 연동 | 피부타입은 실제 값. 키워드·설명 카피는 여전히 `src/data/diagnosisResult.ts` |
+| `src/screens/DiagnosisResultScreen.tsx` | 연동 완료 | 피부타입·키워드·설명 모두 진단 응답값 |
 | 스킨몽 이름짓기 | 연동 완료 | `POST /api/skinmon` |
 | `src/screens/HomeScreen.tsx` | 연동 완료 | `GET /api/home` + `GET /api/environment/dust` |
 | `src/screens/ChatScreen.tsx` | 연동 완료 | `POST /api/chat` |
 | `src/screens/MyRoutineScreen.tsx` | 연동 완료 | `GET /api/routines`, 항목 생성·수정·삭제, `PUT .../completion`, `POST /api/care-memos` |
 | `src/screens/RoutineRecommendationScreen.tsx` | 연동 완료 | `POST /api/ai-routines/recommend`, `POST /api/routines/from-ai` |
-| 알림 화면 | 미구현 | 화면 자체가 없다. `GET/POST/PUT/DELETE /api/notifications` |
+| `src/screens/NotificationScreen.tsx` | 연동 완료 | `GET/POST/PUT/DELETE /api/notifications`, `PUT /api/notifications/uv-risk-warning` |
 | `src/data/*.ts` | 폴백으로 남김 | 첫 응답 전이나 호출 실패 시 화면이 비지 않도록 유지 |
 
 남은 것
 
-- 회원가입 엔드포인트가 없다. 프론트는 계정을 로컬에 저장한 뒤 테스트 계정으로 로그인한다.
-- 알림 설정 화면이 없다. 백엔드는 준비돼 있다.
-- 진단 결과 화면의 키워드·설명 카피는 백엔드에 대응 필드가 없다. `DIAGNOSIS_RESULT.result_summary` 를 쓸지 결정이 필요하다.
-- AI 추천은 백엔드에 `OPENAI_API_KEY` 가 있어야 동작한다.
+- **토큰이 없다.** 회원가입·로그인은 비밀번호를 검증하지만 JWT 를 발급하지 않는다. 프론트는 응답의 `userId` 로 개발용 토큰을 만들고 서버는 `DevAuthenticationFilter` 로 읽는다. 배포 전 교체 필요.
 - 지역은 아직 고정값(`서울특별시 강남구`)이다. 위치 권한을 받으면 `GET /api/location` 으로 대체할 수 있다.
+- AI 추천은 백엔드에 `OPENAI_API_KEY` 가 있어야 동작한다.
+- 알림 발송 지역(`GET/PUT /api/notifications/location`)과 디바이스 토큰 등록(`/api/notifications/devices`)에 대응하는 화면이 아직 없다.
+- 홈 화면 캐릭터, 나의 루틴 캐릭터는 디자인대로 자리만 잡혀 있다(실제 아트 미적용).
+- 네비게이션 드로어가 디자인되지 않아 홈 헤더의 햄버거는 임시 목록(나의 루틴 / 알림설정)을 띄운다.
