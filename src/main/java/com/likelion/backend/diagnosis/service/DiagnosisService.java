@@ -5,6 +5,7 @@ import com.likelion.backend.diagnosis.dto.*;
 import com.likelion.backend.diagnosis.mapper.DiagnosisMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -14,6 +15,8 @@ public class DiagnosisService {
 
     private final DiagnosisMapper diagnosisMapper;
 
+    /** 답변 7행과 결과 1행을 함께 남긴다. 둘 중 하나만 저장되면 고아 데이터가 되므로 한 트랜잭션으로 묶는다. */
+    @Transactional
     public DiagnosisSubmitResponse submit(DiagnosisSubmitRequest request) {
         List<String> answers = request.getAnswers();
         if (answers == null || answers.size() != 7) {

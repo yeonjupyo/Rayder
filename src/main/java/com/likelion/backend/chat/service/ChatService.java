@@ -6,6 +6,7 @@ import com.likelion.backend.chat.dto.GeneratedConversationId;
 import com.likelion.backend.chat.mapper.ChatMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 @RequiredArgsConstructor
@@ -13,6 +14,8 @@ public class ChatService {
 
     private final ChatMapper chatMapper;
 
+    /** 대화방 생성과 사용자/봇 메시지 2행을 함께 남기므로 한 트랜잭션으로 묶는다. */
+    @Transactional
     public ChatResponse chat(ChatRequest request) {
         int conversationId = getOrCreateConversation(request.getUserId());
 
