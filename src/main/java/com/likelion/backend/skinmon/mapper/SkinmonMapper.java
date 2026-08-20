@@ -1,6 +1,7 @@
 package com.likelion.backend.skinmon.mapper;
 
 import com.likelion.backend.skinmon.dto.GeneratedSkinmonId;
+import com.likelion.backend.skinmon.dto.SkinmonCreateResponse;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
@@ -10,9 +11,15 @@ public interface SkinmonMapper {
 
     Integer findAppearanceId(@Param("skinType") String skinType, @Param("expressionType") String expressionType);
 
-    void insertSkinmon(@Param("userId") int userId,
+    void upsertSkinmon(@Param("userId") int userId,
                        @Param("resultId") int resultId,
                        @Param("skinmonName") String skinmonName,
                        @Param("appearanceId") int appearanceId,
                        @Param("holder") GeneratedSkinmonId holder);
+
+    SkinmonCreateResponse findByUserId(@Param("userId") int userId);
+
+    SkinmonCreateResponse findBySkinmonId(@Param("skinmonId") int skinmonId);
+
+    void updateAppearance(@Param("skinmonId") int skinmonId, @Param("appearanceId") int appearanceId);
 }
