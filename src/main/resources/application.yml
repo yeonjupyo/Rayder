@@ -14,6 +14,12 @@ mybatis:
     map-underscore-to-camel-case: true
     call-setters-on-nulls: true
 
+logging:
+  request:
+    # 요청/응답을 request 테이블에 적재하는 기능. 기본 비활성.
+    # 켜기 전에 JSON 컬럼 직렬화와 본문 마스킹을 먼저 고쳐야 한다(RequestLogWriter 주석 참고).
+    enabled: ${REQUEST_LOG_ENABLED:false}
+
 management:
   endpoints:
     web:

@@ -10,6 +10,7 @@ import java.util.Enumeration;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import lombok.RequiredArgsConstructor;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 import org.springframework.web.util.ContentCachingRequestWrapper;
@@ -32,6 +33,7 @@ import org.springframework.web.util.ContentCachingResponseWrapper;
  * committed, but after this filter's early half executes.
  */
 @Component
+@ConditionalOnProperty(prefix = "logging.request", name = "enabled", havingValue = "true")
 @RequiredArgsConstructor
 public class RequestLogFilter extends OncePerRequestFilter {
 
