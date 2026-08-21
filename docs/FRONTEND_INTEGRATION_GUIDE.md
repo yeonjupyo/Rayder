@@ -59,6 +59,8 @@ export OPENAI_API_KEY=...            # AI 추천을 쓸 때만
 
 CORS 는 `web.cors.allowed-origins` 로 허용한다. 로컬 프로파일에 Vite dev(5173)·preview(4173)가 등록돼 있고, 다른 포트를 쓰면 `application-local.yml` 에 추가해야 한다.
 
+배포 도메인은 프론트 `https://uvmate.bainble.kr`, API `https://uvmate-api.bainble.kr` 다. 서로 다른 오리진이라 CORS 가 필수이며, prod 프로파일의 기본값이 프론트 도메인으로 들어가 있다(`WEB_CORS_ALLOWED_ORIGINS` 로 덮어쓸 수 있다). 프론트의 기본 API 주소도 `https://uvmate-api.bainble.kr` 이므로 배포 빌드에는 별도 환경변수가 필요 없다.
+
 ## 인증: 임시 개발용 브릿지
 
 알림 · 루틴 · 케어메모 · AI 엔드포인트는 요청 속성 `authenticatedUserId` 를 읽는데, 이를 채우는 JWT 필터가 아직 없어서 호출 자체가 불가능했다. 연동을 막지 않기 위해 임시 브릿지(`DevAuthenticationFilter`)를 넣었다.
